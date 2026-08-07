@@ -1,5 +1,10 @@
 import { electives, type Elective } from '@/mocks/electives'
-import { applications, type Application, type ApplicationStatus } from '@/mocks/applications'
+import {
+  applications,
+  type Application,
+  type ApplicationStatus,
+  type PaymentMethod,
+} from '@/mocks/applications'
 import { documents, type UserDocument } from '@/mocks/documents'
 
 export interface ElectiveFilters {
@@ -15,18 +20,17 @@ export interface ApplicationInput {
   startDate: string
   durationWeeks: number
   documentsIncluded: string[]
+  paymentMethod: PaymentMethod
 }
 
 export interface OnboardingData {
-  role: string
-  graduationYear: number
+  graduationYear?: number
   visaStatus: string
   goals: string[]
-  electives: string[]
-  locations: string[]
   earliestStart: string
   durationPreference: number
   travelReady: boolean
+  onboarded?: boolean
 }
 
 const latency = (ms = 350) => new Promise(resolve => setTimeout(resolve, ms))
@@ -111,6 +115,7 @@ export async function submitApplication(input: ApplicationInput): Promise<Applic
     durationWeeks: input.durationWeeks,
     submittedAt,
     documentsIncluded: input.documentsIncluded,
+    paymentMethod: input.paymentMethod,
     timeline: [
       { label: 'Application submitted', date: submittedAt, done: true },
       { label: 'Documents reviewed', date: addDays(submittedAt, 5), done: false },

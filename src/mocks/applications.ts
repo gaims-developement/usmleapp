@@ -7,6 +7,17 @@ export type ApplicationStatus =
   | 'withdrawn'
   | 'rejected'
 
+export type PaymentMethod = 'razorpay' | 'stripe' | 'card' | 'bank_transfer' | 'upi' | 'paypal'
+
+export const paymentMethodLabels: Record<PaymentMethod, string> = {
+  razorpay: 'Razorpay',
+  stripe: 'Stripe',
+  card: 'Debit / Credit card',
+  bank_transfer: 'Bank transfer',
+  upi: 'UPI',
+  paypal: 'PayPal',
+}
+
 export interface ApplicationTimelineStep {
   label: string
   date: string
@@ -25,6 +36,7 @@ export interface Application {
   durationWeeks: number
   submittedAt: string
   documentsIncluded: string[]
+  paymentMethod?: PaymentMethod
   timeline: ApplicationTimelineStep[]
 }
 

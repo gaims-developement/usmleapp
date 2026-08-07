@@ -6,19 +6,38 @@ import {
   ArrowRight,
   Building2,
   CheckCircle2,
+  CreditCard,
   DollarSign,
   FileText,
+  Landmark,
+  Lock,
   MapPin,
   ShieldCheck,
+  Smartphone,
+  Sparkles,
+  Wallet,
+  Zap,
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { useDocuments, useElective, useSubmitApplication } from '@/lib/queries'
+import { GatewayCheckout } from '@/components/checkout/gateway-checkout'
 import { PageLoader } from '@/components/ui/spinner'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { formatDate } from '@/components/electives/elective-card'
 import { cn } from '@/lib/utils'
+import { paymentMethodLabels, type PaymentMethod } from '@/mocks/applications'
 
-const STEPS = ['Review', 'Rotation details', 'Documents & submit']
+const STEPS = ['Review', 'Rotation details', 'Payment', 'Documents & submit']
+
+const PAYMENT_OPTIONS: { id: PaymentMethod; label: string; description: string; icon: LucideIcon }[] = [
+  { id: 'razorpay', label: 'Razorpay', description: 'Instant, secure online payments', icon: Zap },
+  { id: 'stripe', label: 'Stripe', description: 'Trusted global payment processor', icon: Sparkles },
+  { id: 'card', label: 'Debit / Credit card', description: 'Visa, Mastercard, Amex & more', icon: CreditCard },
+  { id: 'bank_transfer', label: 'Bank transfer', description: 'Direct transfer from your bank', icon: Landmark },
+  { id: 'upi', label: 'UPI', description: 'Pay via GPay, PhonePe, Paytm & more', icon: Smartphone },
+  { id: 'paypal', label: 'PayPal', description: 'Pay with your PayPal balance or cards', icon: Wallet },
+]
 
 export function ApplyPage() {
   const { id = '' } = useParams()
@@ -33,6 +52,8 @@ export function ApplyPage() {
   const [startDate, setStartDate] = useState(params.get('start') ?? '')
   const [duration, setDuration] = useState<number | null>(null)
   const [selectedDocs, setSelectedDocs] = useState<string[]>([])
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null)
+  const [activeGateway, setActiveGateway] = useState<PaymentMethod | null>(null)
 
   const availableDocs = useMemo(
     () => (documents ?? []).filter(d => d.status === 'uploaded' || d.status === 'expiring'),
@@ -66,12 +87,13 @@ export function ApplyPage() {
   const canSubmit = docsSelected.length > 0
 
   async function handleSubmit() {
-    if (!canSubmit) return
+    if (!canSubmit || !paymentMethod) return
     const app = await submit.mutateAsync({
       electiveId: program.id,
       startDate,
       durationWeeks: duration!,
       documentsIncluded: docsSelected,
+      paymentMethod,
     })
     navigate('/applications', { state: { justApplied: app.id } })
   }
@@ -182,8 +204,14 @@ export function ApplyPage() {
               <select
                 value={startDate}
                 onChange={e => setStartDate(e.target.value)}
-                className="w-full cursor-pointer rounded-xl border border-ink-200 bg-ink-50/50 px-4 py-3 text-sm outline-none transition-colors focus:border-brand-500 focus:bg-white"
+                className={cn(
+                  'w-full cursor-pointer rounded-xl border px-4 py-3 text-sm outline-none transition-colors focus:border-brand-500 focus:bg-white',
+                  startDate ? 'border-ink-200 bg-ink-50/50' : 'border-ink-200 bg-ink-50/50 text-ink-400',
+                )}
               >
+                <option value="" disabled>
+                  Select date
+                </option>
                 {elective.startDates.map(d => (
                   <option key={d} value={d}>
                     {formatDate(d)}
@@ -220,6 +248,82 @@ export function ApplyPage() {
         )}
 
         {step === 2 && (
+          <div className="space-y-6">
+            <div>
+              <h2 className="font-display text-lg font-bold text-ink-900">Select a payment method</h2>
+              <p className="mt-1 text-sm text-ink-600">
+                Secure checkout for your rotation. Choose how you&apos;d like to pay.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-between gap-4 rounded-2xl border border-brand-200 bg-brand-50/60 p-5">
+              <div>
+                <p className="text-sm text-ink-500">Total program fee</p>
+                <p className="font-display text-2xl font-bold text-ink-900">
+                  ${elective.fee.toLocaleString()}
+                </p>
+              </div>
+              <div className="text-right text-xs text-ink-500">
+                <p className="font-medium text-ink-700">{elective.hospital}</p>
+                <p>
+                  {formatDate(startDate)} · {duration} weeks
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              {PAYMENT_OPTIONS.map(opt => {
+                const Icon = opt.icon
+                const paid = paymentMethod === opt.id
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setActiveGateway(opt.id)}
+                    aria-pressed={paid}
+                    className={cn(
+                      'flex items-center gap-3 rounded-2xl border px-4 py-3.5 text-left transition-colors',
+                      paid
+                        ? 'border-brand-600 bg-brand-50 ring-2 ring-brand-500'
+                        : 'border-ink-200 bg-white hover:border-brand-300',
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        'grid size-10 shrink-0 place-items-center rounded-xl transition-colors',
+                        paid ? 'bg-brand-600 text-white' : 'bg-ink-100 text-ink-600',
+                      )}
+                    >
+                      <Icon className="size-5" aria-hidden />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-semibold text-ink-900">{opt.label}</span>
+                      <span className="block truncate text-xs text-ink-500">
+                        {paid ? 'Payment completed' : opt.description}
+                      </span>
+                    </span>
+                    {paid && <CheckCircle2 className="size-5 shrink-0 text-brand-600" aria-hidden />}
+                  </button>
+                )
+              })}
+            </div>
+
+            {paymentMethod && (
+              <p className="flex items-center gap-2 rounded-xl bg-brand-50 px-4 py-3 text-sm text-brand-800">
+                <CheckCircle2 className="size-4.5 shrink-0 text-brand-600" aria-hidden />
+                Paid {`$${elective.fee.toLocaleString()}`} via {paymentMethodLabels[paymentMethod]}.
+                You can now continue.
+              </p>
+            )}
+
+            <p className="flex items-center gap-1.5 text-xs text-ink-500">
+              <Lock className="size-3.5 text-brand-600" aria-hidden />
+              Payments are encrypted and processed securely. This is a demo checkout.
+            </p>
+          </div>
+        )}
+
+        {step === 3 && (
           <div className="space-y-6">
             <div>
               <h2 className="font-display text-lg font-bold text-ink-900">Attach documents</h2>
@@ -281,20 +385,7 @@ export function ApplyPage() {
             <ArrowLeft className="size-4" aria-hidden />
             Back
           </Button>
-          {step < 2 ? (
-            <Button
-              type="button"
-              size="lg"
-              className="flex-1"
-              disabled={step === 0 ? !eligibilityConfirmed : !canProceedToDocs}
-              onClick={() => {
-                if (step === 1) beginIfEmpty()
-                setStep(s => s + 1)
-              }}
-            >
-              Continue <ArrowRight className="size-4" aria-hidden />
-            </Button>
-          ) : (
+          {step === 3 ? (
             <Button
               type="button"
               size="lg"
@@ -304,15 +395,49 @@ export function ApplyPage() {
             >
               {submit.isPending ? 'Submitting…' : 'Submit application'}
             </Button>
+          ) : (
+            <Button
+              type="button"
+              size="lg"
+              className="flex-1"
+              disabled={
+                step === 0 ? !eligibilityConfirmed : step === 1 ? !canProceedToDocs : !paymentMethod
+              }
+              onClick={() => {
+                if (step === 1) beginIfEmpty()
+                setStep(s => s + 1)
+              }}
+            >
+              {step === 1 ? (
+                <>
+                  Continue to payment <ArrowRight className="size-4" aria-hidden />
+                </>
+              ) : (
+                <>
+                  Continue <ArrowRight className="size-4" aria-hidden />
+                </>
+              )}
+            </Button>
           )}
         </div>
-        {step === 2 && (
+        {step === 3 && (
           <p className="mt-3 flex items-center justify-center gap-1.5 text-xs text-ink-500">
             <ShieldCheck className="size-3.5 text-brand-600" aria-hidden />
             Your application is sent directly to the program coordinator.
           </p>
         )}
       </motion.div>
+
+      {activeGateway && (
+        <GatewayCheckout
+          key={activeGateway}
+          gateway={activeGateway}
+          amount={elective.fee}
+          hospital={elective.hospital}
+          onComplete={() => setPaymentMethod(activeGateway)}
+          onClose={() => setActiveGateway(null)}
+        />
+      )}
     </div>
   )
 }

@@ -1,5 +1,5 @@
-import { seedUsers, type MockUserRecord } from '@/mock/users'
 import type { AuthUser, RoleId } from '@/types/rbac'
+import { apiGet, apiPatch } from '@/lib/apiClient'
 
 export interface CreateUserInput {
   name: string
@@ -12,61 +12,34 @@ export interface CreateUserInput {
   locations?: string[]
 }
 
-let users: MockUserRecord[] = [...seedUsers]
-
-function sanitize(record: MockUserRecord): AuthUser {
-  const { password: _password, ...user } = record
-  return user
-}
-
-function nextId() {
-  return `usr-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
+export interface UpdateUserInput {
+  name?: string
+  onboarded?: boolean
+  college?: string | null
+  dob?: string | null
+  graduationYear?: number | null
+  visaStatus?: string | null
+  goals?: string[]
+  electives?: string[]
+  locations?: string[]
+  earliestStart?: string | null
+  durationPreference?: number | null
+  travelReady?: boolean
 }
 
 export const userService = {
-  findByCredentials(email: string, password: string): AuthUser | null {
-    const match = users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password)
-    return match ? sanitize(match) : null
+  async update(id: string, patch: UpdateUserInput): Promise<AuthUser> {
+    void id
+    const { user } = await apiPatch<{ user: AuthUser }>(`/users/me`, patch)
+    return user
+  },
+  async findById(id: string): Promise<AuthUser | null> {
+    const { user } = await apiGet<{ user: AuthUser }>(`/users/me`)
+    return user.id === id ? user : null
   },
 
-  findByEmail(email: string): AuthUser | null {
-    const match = users.find(u => u.email.toLowerCase() === email.toLowerCase())
-    return match ? sanitize(match) : null
-  },
-
-  findById(id: string): AuthUser | null {
-    const match = users.find(u => u.id === id)
-    return match ? sanitize(match) : null
-  },
-
-  list(): AuthUser[] {
-    return users.map(sanitize)
-  },
-
-  create(input: CreateUserInput): AuthUser {
-    const existing = users.some(u => u.email.toLowerCase() === input.email.toLowerCase())
-    if (existing) throw new Error('A user with this email already exists')
-    const record: MockUserRecord = {
-      id: nextId(),
-      name: input.name,
-      email: input.email,
-      password: input.password ?? '',
-      role: input.role ?? 'STUDENT',
-      onboarded: input.role === 'STUDENT' ? false : true,
-      college: input.college,
-      dob: input.dob,
-      electives: input.electives,
-      locations: input.locations,
-      createdAt: new Date().toISOString().slice(0, 10),
-    }
-    users = [record, ...users]
-    return sanitize(record)
-  },
-
-  update(id: string, patch: Partial<AuthUser>): AuthUser | null {
-    const index = users.findIndex(u => u.id === id)
-    if (index === -1) return null
-    users[index] = { ...users[index], ...patch }
-    return sanitize(users[index])
+  async findByEmail(email: string): Promise<AuthUser | null> {
+    const { user } = await apiGet<{ user: AuthUser }>(`/users/me`)
+    return user.email.toLowerCase() === email.toLowerCase() ? user : null
   },
 }

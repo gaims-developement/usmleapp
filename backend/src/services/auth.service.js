@@ -27,10 +27,14 @@ const toDateOnly = value => (value ? new Date(value).toISOString().slice(0, 10) 
 
 export function serializeUser(user) {
   const student = user.studentProfile
+  const hospital = user.hospitalProfile
+  const doctor = user.doctorProfile
+  const reviewer = user.reviewerProfile
   return {
     id: user.id,
     name: user.name,
     email: user.email,
+    avatarUrl: user.avatarUrl ?? null,
     role: user.role?.name ?? 'STUDENT',
     onboarded: user.onboarded,
     emailVerified: Boolean(user.emailVerifiedAt),
@@ -45,6 +49,38 @@ export function serializeUser(user) {
     earliestStart: student?.earliestStart ? toDateOnly(student.earliestStart) : undefined,
     durationPreference: student?.durationPreference ?? undefined,
     travelReady: student?.travelReady ?? undefined,
+    hospital: hospital
+      ? {
+          name: hospital.name ?? null,
+          city: hospital.city ?? null,
+          state: hospital.state ?? null,
+          country: hospital.country ?? null,
+          email: hospital.email ?? null,
+          phone: hospital.phone ?? null,
+          description: hospital.description ?? null,
+          coordinatorName: hospital.coordinatorName ?? null,
+          coordinatorEmail: hospital.coordinatorEmail ?? null,
+          coordinatorPhone: hospital.coordinatorPhone ?? null,
+          tier: hospital.tier ?? null,
+          status: hospital.status ?? null,
+        }
+      : undefined,
+    doctor: doctor
+      ? {
+          specialty: doctor.specialty ?? null,
+          email: doctor.email ?? null,
+          phone: doctor.phone ?? null,
+          availability: doctor.availability ?? null,
+          status: doctor.status ?? null,
+        }
+      : undefined,
+    reviewer: reviewer
+      ? {
+          specialty: reviewer.specialty ?? null,
+          department: reviewer.department ?? null,
+          timezone: reviewer.timezone ?? null,
+        }
+      : undefined,
     createdAt: user.createdAt.toISOString(),
   }
 }
@@ -87,6 +123,10 @@ async function login({ email, password }, meta = {}) {
   const passwordMatches = await comparePassword(password, user.passwordHash)
   if (!passwordMatches) {
     throw new AppError('Invalid email or password', 401, 'INVALID_CREDENTIALS')
+  }
+
+  if (user.deletedAt) {
+    throw new AppError('This account has been deactivated', 403, 'ACCOUNT_DEACTIVATED')
   }
 
   const tokens = await issueTokenPair(user, meta)
@@ -284,6 +324,10 @@ async function refresh(refreshToken, meta = {}) {
     throw new AppError('Account no longer exists', 401, 'USER_NOT_FOUND')
   }
 
+  if (record.user.deletedAt) {
+    throw new AppError('This account has been deactivated', 403, 'ACCOUNT_DEACTIVATED')
+  }
+
   const nextRefresh = await createRefreshToken(record.userId, meta)
   await prisma.refreshToken.update({
     where: { id: record.id },
@@ -446,6 +490,10 @@ async function getMe(userId) {
 
   if (!user) {
     throw new AppError('User not found', 404, 'USER_NOT_FOUND')
+  }
+
+  if (user.deletedAt) {
+    throw new AppError('This account has been deactivated', 403, 'ACCOUNT_DEACTIVATED')
   }
 
   return serializeUser(user)

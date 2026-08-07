@@ -16,6 +16,7 @@ import { privacySections, termsSections } from '@/data/legal'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
 import { Container } from '@/components/ui/container'
+import { Spinner } from '@/components/ui/spinner'
 import { LegalAgreementModal } from '@/components/ui/legal-agreement-modal'
 import { DatePicker } from '@/components/ui/date-picker'
 import { ChipSelect } from '@/components/ui/chip-select'
@@ -33,6 +34,7 @@ const electiveOptions = electives.map(e => e.specialty)
 export function SignupPage() {
   const [step, setStep] = useState(1)
   const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
   const [agreements, setAgreements] = useState<AgreementState>({ terms: false, privacy: false })
   const [legalDoc, setLegalDoc] = useState<LegalDoc | null>(null)
   const { signUp } = useAuth()
@@ -70,15 +72,29 @@ export function SignupPage() {
       return
     }
     setSubmitting(true)
-    await signUp({
+    setSubmitError(null)
+
+    const payload = {
       name: form.name,
       email: form.email,
+      password: form.password,
       college: form.college,
       dob: form.dob ?? undefined,
       electives: form.electives,
       locations: form.locations,
-    })
-    navigate('/onboarding', { replace: true })
+    }
+
+    if (import.meta.env.DEV) {
+      console.info('[signup] payload', JSON.stringify(payload, null, 2))
+    }
+
+    try {
+      await signUp(payload)
+      navigate('/onboarding', { replace: true })
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
+      setSubmitting(false)
+    }
   }
 
   function handleAgree(doc: LegalDoc) {
@@ -115,7 +131,8 @@ export function SignupPage() {
               <AuthField
                 label="Full name"
                 type="text"
-                placeholder="Dr. Jane Doe"
+                placeholder="e.g. Jane Doe"
+                hint="Please don't add prefixes like Dr., Mr., Mrs., or Ms."
                 icon={<UserRound className="size-4.5 text-ink-400" aria-hidden />}
                 value={form.name}
                 onChange={v => update('name', v)}
@@ -225,6 +242,12 @@ export function SignupPage() {
             </>
           )}
 
+          {submitError && (
+            <p className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {submitError}
+            </p>
+          )}
+
           <p className="mt-6 text-center text-sm text-ink-600">
             Already have an account?{' '}
             <Link to="/login" className="font-semibold text-brand-700 hover:text-brand-800">
@@ -234,9 +257,10 @@ export function SignupPage() {
         </form>
 
         {submitting && (
-          <p className="mt-4 rounded-2xl border border-brand-200 bg-brand-50 p-4 text-center text-sm text-brand-800">
+          <div className="mt-4 flex items-center justify-center gap-3 rounded-2xl border border-brand-200 bg-brand-50 p-4 text-center text-sm font-medium text-brand-800">
+            <Spinner className="size-5" />
             Setting up your account…
-          </p>
+          </div>
         )}
 
         <Link
@@ -349,13 +373,14 @@ interface AuthFieldProps {
   label: string
   type: string
   placeholder: string
+  hint?: string
   icon: ReactNode
   value?: string
   onChange?: (value: string) => void
   minLength?: number
 }
 
-export function AuthField({ label, type, placeholder, icon, value, onChange, minLength }: AuthFieldProps) {
+export function AuthField({ label, type, placeholder, hint, icon, value, onChange, minLength }: AuthFieldProps) {
   return (
     <label className="mt-4 block">
       <span className="mb-1.5 block text-sm font-medium text-ink-800">{label}</span>
@@ -371,6 +396,7 @@ export function AuthField({ label, type, placeholder, icon, value, onChange, min
           className="w-full rounded-2xl border border-ink-200 bg-ink-50/50 py-3 pl-11 pr-4 text-sm text-ink-900 outline-none transition-colors placeholder:text-ink-400 focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10"
         />
       </span>
+      {hint && <span className="mt-1 block text-xs text-ink-500">{hint}</span>}
     </label>
   )
 }

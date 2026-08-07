@@ -57,8 +57,12 @@ export interface LoginCredentials {
   password: string
 }
 
-export interface LoginResult {
+export interface TokenPair {
+  accessToken: string
+  refreshToken: string
+  refreshTokenExpiresAt: string
+}
+
+export interface LoginResult extends TokenPair {
   user: AuthUser
-  /** Mock JWT-shaped token. Replace with a real signed JWT when the Express API is connected. */
-  token: string
 }

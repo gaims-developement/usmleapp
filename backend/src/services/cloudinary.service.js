@@ -10,3 +10,12 @@ export function uploadBufferToCloudinary(fileBuffer, options = {}) {
     stream.end(fileBuffer)
   })
 }
+
+export function deleteCloudinaryAsset(publicId) {
+  return new Promise((resolve, reject) => {
+    cloudinary.uploader.destroy(publicId, (error, result) => {
+      if (error) return reject(error)
+      return resolve(result)
+    })
+  })
+}

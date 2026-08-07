@@ -6,6 +6,19 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(5000),
   CLIENT_URL: z.string().url().default('http://127.0.0.1:5173'),
   APP_URL: z.string().url().default('http://127.0.0.1:5173'),
+  // Comma-separated allowlist of origins allowed to call the API.
+  // Defaults to CLIENT_URL when unset, preserving current behavior.
+  CORS_ALLOWED_ORIGINS: z
+    .string()
+    .optional()
+    .default('')
+    .transform(value => {
+      if (!value || !value.trim()) return []
+      return value
+        .split(',')
+        .map(origin => origin.trim())
+        .filter(Boolean)
+    }),
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
   JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
   JWT_EXPIRES_IN: z.string().default('15m'),
@@ -31,4 +44,11 @@ if (parsed.data.JWT_SECRET === parsed.data.JWT_REFRESH_SECRET) {
   process.exit(1)
 }
 
+// When CORS_ALLOWED_ORIGINS is empty, fall back to the single CLIENT_URL.
+// This keeps existing deployments working without any configuration change.
+const allowedOrigins = new Set(
+  parsed.data.CORS_ALLOWED_ORIGINS.length > 0 ? parsed.data.CORS_ALLOWED_ORIGINS : [parsed.data.CLIENT_URL],
+)
+
 export const env = parsed.data
+export { allowedOrigins }

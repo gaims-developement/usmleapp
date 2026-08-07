@@ -71,10 +71,20 @@ enum SupportPriority {
 }
 
 enum PaymentStatus {
-  PENDING
+  AWAITING_PAYMENT
+  PAYMENT_SUBMITTED
+  UNDER_VERIFICATION
   PAID
-  FAILED
+  REJECTED
   REFUNDED
+}
+
+enum PaymentMethod {
+  UPI
+  BANK_TRANSFER
+  PAYPAL
+  RAZORPAY
+  STRIPE
 }
 
 enum CertificateStatus {
@@ -152,57 +162,61 @@ model RolePermission {
 }
 
 model User {
-  id                      String                  @id @default(cuid())
-  email                   String                  @unique
-  name                    String
-  passwordHash            String?
-  roleId                  String?
-  role                    Role?                   @relation(fields: [roleId], references: [id], onDelete: SetNull)
-  onboarded               Boolean                 @default(false)
-  emailVerifiedAt         DateTime?
-  createdAt               DateTime                @default(now())
-  updatedAt               DateTime                @updatedAt
+  id              String    @id @default(cuid())
+  email           String    @unique
+  name            String
+  passwordHash    String?
+  avatarUrl       String?
+  avatarPublicId  String?
+  roleId          String?
+  role            Role?     @relation(fields: [roleId], references: [id], onDelete: SetNull)
+  onboarded       Boolean   @default(false)
+  emailVerifiedAt DateTime?
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  studentProfile          StudentProfile?
-  hospitalProfile         HospitalProfile?
-  doctorProfile           DoctorProfile?
-  reviewerProfile         ReviewerProfile?
-  studentPreference       StudentPreference?
+  studentProfile    StudentProfile?
+  hospitalProfile   HospitalProfile?
+  doctorProfile     DoctorProfile?
+  reviewerProfile   ReviewerProfile?
+  studentPreference StudentPreference?
 
   refreshTokens           RefreshToken[]
   emailVerificationTokens EmailVerificationToken[]
   passwordResetTokens     PasswordResetToken[]
 
-  authoredAnnouncements   Announcement[]         @relation("AnnouncementAuthor")
-  conversationParticipants ConversationParticipant[]
-  sentMessages            Message[]               @relation("MessageSender")
-  notifications           Notification[]
-  supportTickets          SupportTicket[]         @relation("TicketReporter")
-  assignedTickets         SupportTicket[]         @relation("TicketAssignee")
-  messageTemplates        MessageTemplate[]       @relation("TemplateAuthor")
-  auditLogs               AuditLog[]              @relation("Actor")
-  partnerRegistrations   PartnerRegistration[]   @relation("RegisteredBy")
-  reviewedPartnerRegistrations PartnerRegistration[] @relation("ReviewedPartnerRegistrations")
-  payments                Payment[]               @relation("Payer")
-  calendarEvents          CalendarEvent[]         @relation("EventCreator")
-  createdByPrograms       Program[]               @relation("ProgramCreator")
-  createdByAnnouncements  Announcement[]         @relation("AnnouncementCreator")
+  authoredAnnouncements        Announcement[]            @relation("AnnouncementAuthor")
+  conversationParticipants     ConversationParticipant[]
+  sentMessages                 Message[]                 @relation("MessageSender")
+  notifications                Notification[]
+  supportTickets               SupportTicket[]           @relation("TicketReporter")
+  assignedTickets              SupportTicket[]           @relation("TicketAssignee")
+  messageTemplates             MessageTemplate[]         @relation("TemplateAuthor")
+  auditLogs                    AuditLog[]                @relation("Actor")
+  partnerRegistrations         PartnerRegistration[]     @relation("RegisteredBy")
+  reviewedPartnerRegistrations PartnerRegistration[]     @relation("ReviewedPartnerRegistrations")
+  studentPayments              Payment[]                 @relation("StudentPayments")
+  verifiedPayments             Payment[]                 @relation("VerifiedPayments")
+  calendarEvents               CalendarEvent[]           @relation("EventCreator")
+  createdByPrograms            Program[]                 @relation("ProgramCreator")
+  createdByAnnouncements       Announcement[]            @relation("AnnouncementCreator")
 
   @@index([roleId])
   @@index([email])
 }
 
 model RefreshToken {
-  id          String    @id @default(cuid())
-  userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash   String    @unique
-  expiresAt   DateTime
-  revokedAt   DateTime?
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash    String    @unique
+  expiresAt    DateTime
+  revokedAt    DateTime?
   replacedById String?
-  ipAddress   String?
-  userAgent   String?
-  createdAt   DateTime  @default(now())
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime  @default(now())
 
   @@index([userId])
   @@index([expiresAt])
@@ -235,94 +249,94 @@ model PasswordResetToken {
 }
 
 model StudentProfile {
-  id                   String                   @id @default(cuid())
-  userId               String                   @unique
-  user                 User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  college              String?
-  dateOfBirth          DateTime?
-  graduationYear       Int?
-  visaStatus           String?
-  earliestStart        DateTime?
-  durationPreference   Int?
-  travelReady          Boolean                  @default(false)
-  createdAt            DateTime                 @default(now())
-  updatedAt            DateTime                 @updatedAt
+  id                 String    @id @default(cuid())
+  userId             String    @unique
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  college            String?
+  dateOfBirth        DateTime?
+  graduationYear     Int?
+  visaStatus         String?
+  earliestStart      DateTime?
+  durationPreference Int?
+  travelReady        Boolean   @default(false)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
-  interests            StudentInterest[]
-  locations            StudentLocationPreference[]
-  goals                StudentGoal[]
-  applications         Application[]
+  interests    StudentInterest[]
+  locations    StudentLocationPreference[]
+  goals        StudentGoal[]
+  applications Application[]
 
   @@index([college])
 }
 
 model StudentInterest {
-  id                String          @id @default(cuid())
-  studentProfileId  String
-  studentProfile    StudentProfile  @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
-  value             String
+  id               String         @id @default(cuid())
+  studentProfileId String
+  studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  value            String
 
   @@unique([studentProfileId, value])
   @@index([studentProfileId])
 }
 
 model StudentLocationPreference {
-  id                String          @id @default(cuid())
-  studentProfileId  String
-  studentProfile    StudentProfile  @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
-  value             String
+  id               String         @id @default(cuid())
+  studentProfileId String
+  studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  value            String
 
   @@unique([studentProfileId, value])
   @@index([studentProfileId])
 }
 
 model StudentGoal {
-  id                String          @id @default(cuid())
-  studentProfileId  String
-  studentProfile    StudentProfile  @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
-  value             String
+  id               String         @id @default(cuid())
+  studentProfileId String
+  studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  value            String
 
   @@unique([studentProfileId, value])
   @@index([studentProfileId])
 }
 
 model StudentPreference {
-  id                    String        @id @default(cuid())
-  userId                String        @unique
-  user                  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  applicationUpdates    Boolean       @default(true)
-  announcements         Boolean       @default(true)
-  deadlineReminders     Boolean       @default(true)
-  marketing             Boolean       @default(false)
-  showProfile           Boolean       @default(true)
-  createdAt             DateTime      @default(now())
-  updatedAt             DateTime      @updatedAt
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  applicationUpdates Boolean  @default(true)
+  announcements      Boolean  @default(true)
+  deadlineReminders  Boolean  @default(true)
+  marketing          Boolean  @default(false)
+  showProfile        Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 }
 
 model HospitalProfile {
-  id                 String                  @id @default(cuid())
-  userId             String                  @unique
-  user               User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name               String?
-  city               String?
-  state              String?
-  country            String?
-  email              String?
-  phone              String?
-  description        String?                 @db.Text
-  coordinatorName    String?
-  coordinatorEmail   String?
-  coordinatorPhone   String?
-  tier               String?
-  status             String?
-  joinedAt           DateTime                @default(now())
-  createdAt          DateTime                @default(now())
-  updatedAt          DateTime                @updatedAt
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name             String?
+  city             String?
+  state            String?
+  country          String?
+  email            String?
+  phone            String?
+  description      String?  @db.Text
+  coordinatorName  String?
+  coordinatorEmail String?
+  coordinatorPhone String?
+  tier             String?
+  status           String?
+  joinedAt         DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
-  accreditation      HospitalAccreditation[]
-  programs           Program[]
-  doctors            DoctorProfile[]
-  calendarEvents     CalendarEvent[]
+  accreditation        HospitalAccreditation[]
+  programs             Program[]
+  doctors              DoctorProfile[]
+  calendarEvents       CalendarEvent[]
   partnerRegistrations PartnerRegistration[]
 
   @@index([name])
@@ -330,86 +344,86 @@ model HospitalProfile {
 }
 
 model HospitalAccreditation {
-  id           String          @id @default(cuid())
-  hospitalId   String
-  hospital     HospitalProfile @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
-  label        String
+  id         String          @id @default(cuid())
+  hospitalId String
+  hospital   HospitalProfile @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  label      String
 
   @@unique([hospitalId, label])
   @@index([hospitalId])
 }
 
 model DoctorProfile {
-  id                  String            @id @default(cuid())
-  userId              String            @unique
-  user                User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  hospitalId          String?
-  hospital            HospitalProfile?  @relation(fields: [hospitalId], references: [id], onDelete: SetNull)
-  specialty           String?
-  email               String?
-  phone               String?
-  availability        String?
-  status              String?
-  studentsAssigned    Int               @default(0)
-  currentRotations    Int               @default(0)
-  joinedAt            DateTime          @default(now())
-  createdAt           DateTime          @default(now())
-  updatedAt           DateTime          @updatedAt
+  id               String           @id @default(cuid())
+  userId           String           @unique
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  hospitalId       String?
+  hospital         HospitalProfile? @relation(fields: [hospitalId], references: [id], onDelete: SetNull)
+  specialty        String?
+  email            String?
+  phone            String?
+  availability     String?
+  status           String?
+  studentsAssigned Int              @default(0)
+  currentRotations Int              @default(0)
+  joinedAt         DateTime         @default(now())
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
-  applications        Application[]
-  rotations           Rotation[]
-  evaluations         Evaluation[]
-  logbookEntries      LogbookEntry[]
-  letters             LetterOfRecommendation[]
-  certificates        Certificate[]
+  applications   Application[]
+  rotations      Rotation[]
+  evaluations    Evaluation[]
+  logbookEntries LogbookEntry[]
+  letters        LetterOfRecommendation[]
+  certificates   Certificate[]
 
   @@index([hospitalId])
   @@index([status])
 }
 
 model ReviewerProfile {
-  id                 String            @id @default(cuid())
-  userId             String            @unique
-  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  specialty          String?
-  department         String?
-  timezone           String?
-  joinedAt           DateTime          @default(now())
-  createdAt          DateTime          @default(now())
-  updatedAt          DateTime          @updatedAt
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  specialty  String?
+  department String?
+  timezone   String?
+  joinedAt   DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  applications       Application[]
-  reviews            ApplicationReview[]
+  applications Application[]
+  reviews      ApplicationReview[]
 
   @@index([department])
 }
 
 model Program {
-  id               String                @id @default(cuid())
-  hospitalId       String
-  hospital         HospitalProfile       @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
-  creatorId        String?
-  creator          User?                 @relation("ProgramCreator", fields: [creatorId], references: [id], onDelete: SetNull)
-  title            String
-  department       String?
-  specialty        String?
-  duration         String?
-  fee              Decimal?              @db.Decimal(10, 2)
-  seats            Int                  @default(0)
-  filledSeats      Int                  @default(0)
-  deadline         DateTime?
-  startDate        DateTime?
-  description      String?               @db.Text
-  eligibility      String?               @db.Text
-  status           ProgramStatus         @default(DRAFT)
-  slug             String?               @unique
-  createdAt        DateTime              @default(now())
-  updatedAt        DateTime              @updatedAt
+  id          String          @id @default(cuid())
+  hospitalId  String
+  hospital    HospitalProfile @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  creatorId   String?
+  creator     User?           @relation("ProgramCreator", fields: [creatorId], references: [id], onDelete: SetNull)
+  title       String
+  department  String?
+  specialty   String?
+  duration    String?
+  fee         Decimal?        @db.Decimal(10, 2)
+  seats       Int             @default(0)
+  filledSeats Int             @default(0)
+  deadline    DateTime?
+  startDate   DateTime?
+  description String?         @db.Text
+  eligibility String?         @db.Text
+  status      ProgramStatus   @default(DRAFT)
+  slug        String?         @unique
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
 
-  requirements     ProgramRequirement[]
-  slots            ProgramSlot[]
-  faculty          ProgramFaculty[]
-  applications     Application[]
+  requirements ProgramRequirement[]
+  slots        ProgramSlot[]
+  faculty      ProgramFaculty[]
+  applications Application[]
 
   @@index([hospitalId])
   @@index([status])
@@ -417,9 +431,9 @@ model Program {
 }
 
 model ProgramRequirement {
-  id         String  @id @default(cuid())
-  programId  String
-  program    Program @relation(fields: [programId], references: [id], onDelete: Cascade)
+  id          String  @id @default(cuid())
+  programId   String
+  program     Program @relation(fields: [programId], references: [id], onDelete: Cascade)
   requirement String
 
   @@unique([programId, requirement])
@@ -427,59 +441,59 @@ model ProgramRequirement {
 }
 
 model ProgramSlot {
-  id           String    @id @default(cuid())
-  programId    String
-  program      Program   @relation(fields: [programId], references: [id], onDelete: Cascade)
-  startDate    DateTime
-  endDate      DateTime?
-  label        String?
-  isAvailable  Boolean   @default(true)
-  createdAt    DateTime  @default(now())
+  id          String    @id @default(cuid())
+  programId   String
+  program     Program   @relation(fields: [programId], references: [id], onDelete: Cascade)
+  startDate   DateTime
+  endDate     DateTime?
+  label       String?
+  isAvailable Boolean   @default(true)
+  createdAt   DateTime  @default(now())
 
   @@unique([programId, startDate])
   @@index([programId])
 }
 
 model ProgramFaculty {
-  id         String  @id @default(cuid())
-  programId  String
-  program    Program @relation(fields: [programId], references: [id], onDelete: Cascade)
-  name       String
+  id        String  @id @default(cuid())
+  programId String
+  program   Program @relation(fields: [programId], references: [id], onDelete: Cascade)
+  name      String
 
   @@unique([programId, name])
   @@index([programId])
 }
 
 model Application {
-  id                 String                  @id @default(cuid())
-  studentProfileId   String
-  studentProfile     StudentProfile          @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
-  programId          String
-  program            Program                 @relation(fields: [programId], references: [id], onDelete: Restrict)
-  reviewerProfileId  String?
-  reviewerProfile    ReviewerProfile?        @relation(fields: [reviewerProfileId], references: [id], onDelete: SetNull)
-  doctorProfileId    String?
-  doctorProfile      DoctorProfile?          @relation(fields: [doctorProfileId], references: [id], onDelete: SetNull)
-  status             ApplicationStatus       @default(DRAFT)
-  submittedAt        DateTime?
-  reviewedAt         DateTime?
-  reviewMinutes      Int?
-  decisionNote       String?                 @db.Text
-  internalNotes      String?                 @db.Text
-  createdAt          DateTime                @default(now())
-  updatedAt          DateTime                @updatedAt
+  id                String            @id @default(cuid())
+  studentProfileId  String
+  studentProfile    StudentProfile    @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  programId         String
+  program           Program           @relation(fields: [programId], references: [id], onDelete: Restrict)
+  reviewerProfileId String?
+  reviewerProfile   ReviewerProfile?  @relation(fields: [reviewerProfileId], references: [id], onDelete: SetNull)
+  doctorProfileId   String?
+  doctorProfile     DoctorProfile?    @relation(fields: [doctorProfileId], references: [id], onDelete: SetNull)
+  status            ApplicationStatus @default(DRAFT)
+  submittedAt       DateTime?
+  reviewedAt        DateTime?
+  reviewMinutes     Int?
+  decisionNote      String?           @db.Text
+  internalNotes     String?           @db.Text
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
 
-  languages          ApplicationLanguage[]
-  documents          ApplicationDocument[]
-  reviews            ApplicationReview[]
-  rotation           Rotation?
-  evaluations        Evaluation[]
-  logbookEntries     LogbookEntry[]
-  letters            LetterOfRecommendation[]
-  certificates       Certificate[]
-  conversations      Conversation[]
-  notifications      Notification[]
-  payments           Payment[]
+  languages      ApplicationLanguage[]
+  documents      ApplicationDocument[]
+  reviews        ApplicationReview[]
+  rotation       Rotation?
+  evaluations    Evaluation[]
+  logbookEntries LogbookEntry[]
+  letters        LetterOfRecommendation[]
+  certificates   Certificate[]
+  conversations  Conversation[]
+  notifications  Notification[]
+  payments       Payment[]
 
   @@index([studentProfileId])
   @@index([programId])
@@ -499,16 +513,16 @@ model ApplicationLanguage {
 }
 
 model ApplicationDocument {
-  id                String                @id @default(cuid())
-  applicationId     String
-  application       Application           @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  name              String
-  documentUrl       String?
-  verification      DocumentVerification  @default(PENDING)
-  note              String?               @db.Text
-  required          Boolean               @default(true)
-  createdAt         DateTime              @default(now())
-  updatedAt         DateTime              @updatedAt
+  id            String               @id @default(cuid())
+  applicationId String
+  application   Application          @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  name          String
+  documentUrl   String?
+  verification  DocumentVerification @default(PENDING)
+  note          String?              @db.Text
+  required      Boolean              @default(true)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
 
   @@unique([applicationId, name])
   @@index([applicationId])
@@ -516,249 +530,249 @@ model ApplicationDocument {
 }
 
 model ApplicationReview {
-  id                 String              @id @default(cuid())
-  applicationId      String
-  application        Application         @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  reviewerProfileId  String
-  reviewerProfile    ReviewerProfile     @relation(fields: [reviewerProfileId], references: [id], onDelete: Restrict)
-  recommendation     ReviewRecommendation?
-  reviewerNotes      String?             @db.Text
-  internalNotes      String?             @db.Text
-  eligibilityJson    Json?
-  reviewedAt         DateTime            @default(now())
-  reviewMinutes      Int?
+  id                String                @id @default(cuid())
+  applicationId     String
+  application       Application           @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  reviewerProfileId String
+  reviewerProfile   ReviewerProfile       @relation(fields: [reviewerProfileId], references: [id], onDelete: Restrict)
+  recommendation    ReviewRecommendation?
+  reviewerNotes     String?               @db.Text
+  internalNotes     String?               @db.Text
+  eligibilityJson   Json?
+  reviewedAt        DateTime              @default(now())
+  reviewMinutes     Int?
 
   @@index([applicationId, reviewedAt])
   @@index([reviewerProfileId])
 }
 
 model Rotation {
-  id              String          @id @default(cuid())
-  applicationId   String          @unique
-  application     Application     @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  id              String         @id @default(cuid())
+  applicationId   String         @unique
+  application     Application    @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   doctorProfileId String?
-  doctorProfile   DoctorProfile?  @relation(fields: [doctorProfileId], references: [id], onDelete: SetNull)
+  doctorProfile   DoctorProfile? @relation(fields: [doctorProfileId], references: [id], onDelete: SetNull)
   startDate       DateTime?
   endDate         DateTime?
   status          String?
-  notes           String?         @db.Text
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  notes           String?        @db.Text
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
   @@index([doctorProfileId])
 }
 
 model Evaluation {
-  id                   String             @id @default(cuid())
-  applicationId        String
-  application          Application        @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  doctorProfileId      String
-  doctorProfile        DoctorProfile     @relation(fields: [doctorProfileId], references: [id], onDelete: Restrict)
-  status               EvaluationStatus   @default(DRAFT)
-  overallPerformance   Int?
-  strengths            String?            @db.Text
-  areasForImprovement  String?            @db.Text
-  overallComments      String?            @db.Text
-  finalRecommendation  String?
-  submittedAt          DateTime?
-  createdAt            DateTime           @default(now())
-  updatedAt            DateTime           @updatedAt
+  id                  String           @id @default(cuid())
+  applicationId       String
+  application         Application      @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  doctorProfileId     String
+  doctorProfile       DoctorProfile    @relation(fields: [doctorProfileId], references: [id], onDelete: Restrict)
+  status              EvaluationStatus @default(DRAFT)
+  overallPerformance  Int?
+  strengths           String?          @db.Text
+  areasForImprovement String?          @db.Text
+  overallComments     String?          @db.Text
+  finalRecommendation String?
+  submittedAt         DateTime?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
 
-  scores               EvaluationScore[]
+  scores EvaluationScore[]
 
   @@index([applicationId])
   @@index([doctorProfileId])
 }
 
 model EvaluationScore {
-  id             String      @id @default(cuid())
-  evaluationId   String
-  evaluation     Evaluation  @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
-  criterion      String
-  score          Int
+  id           String     @id @default(cuid())
+  evaluationId String
+  evaluation   Evaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+  criterion    String
+  score        Int
 
   @@unique([evaluationId, criterion])
   @@index([evaluationId])
 }
 
 model LogbookEntry {
-  id              String          @id @default(cuid())
+  id              String        @id @default(cuid())
   applicationId   String
-  application     Application     @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  application     Application   @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   doctorProfileId String
-  doctorProfile   DoctorProfile   @relation(fields: [doctorProfileId], references: [id], onDelete: Restrict)
+  doctorProfile   DoctorProfile @relation(fields: [doctorProfileId], references: [id], onDelete: Restrict)
   entryDate       DateTime?
-  status          LogbookStatus   @default(DRAFT)
-  comments        String?         @db.Text
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  status          LogbookStatus @default(DRAFT)
+  comments        String?       @db.Text
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
   @@index([applicationId])
   @@index([doctorProfileId])
 }
 
 model LetterOfRecommendation {
-  id              String          @id @default(cuid())
+  id              String        @id @default(cuid())
   applicationId   String
-  application     Application     @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  application     Application   @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   doctorProfileId String
-  doctorProfile   DoctorProfile   @relation(fields: [doctorProfileId], references: [id], onDelete: Restrict)
-  status          LorStatus       @default(DRAFT)
-  summary         String?         @db.Text
-  strengths       String?         @db.Text
-  body            String?         @db.Text
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  doctorProfile   DoctorProfile @relation(fields: [doctorProfileId], references: [id], onDelete: Restrict)
+  status          LorStatus     @default(DRAFT)
+  summary         String?       @db.Text
+  strengths       String?       @db.Text
+  body            String?       @db.Text
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
   @@index([applicationId])
   @@index([doctorProfileId])
 }
 
 model Certificate {
-  id                 String            @id @default(cuid())
-  applicationId      String
-  application        Application       @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  doctorProfileId    String
-  doctorProfile      DoctorProfile     @relation(fields: [doctorProfileId], references: [id], onDelete: Restrict)
-  certificateStatus  CertificateStatus @default(DRAFT)
-  issuedAt           DateTime?
-  createdAt          DateTime          @default(now())
-  updatedAt          DateTime          @updatedAt
+  id                String            @id @default(cuid())
+  applicationId     String
+  application       Application       @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  doctorProfileId   String
+  doctorProfile     DoctorProfile     @relation(fields: [doctorProfileId], references: [id], onDelete: Restrict)
+  certificateStatus CertificateStatus @default(DRAFT)
+  issuedAt          DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
 
   @@index([applicationId])
   @@index([doctorProfileId])
 }
 
 model Announcement {
-  id            String               @id @default(cuid())
-  authorId      String
-  author        User                 @relation("AnnouncementAuthor", fields: [authorId], references: [id], onDelete: Restrict)
-  creatorId     String?
-  creator       User?                @relation("AnnouncementCreator", fields: [creatorId], references: [id], onDelete: SetNull)
-  title         String
-  body          String               @db.Text
-  status        AnnouncementStatus   @default(DRAFT)
-  publishedAt   DateTime?
-  views         Int                  @default(0)
-  createdAt     DateTime             @default(now())
-  updatedAt     DateTime             @updatedAt
+  id          String             @id @default(cuid())
+  authorId    String
+  author      User               @relation("AnnouncementAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  creatorId   String?
+  creator     User?              @relation("AnnouncementCreator", fields: [creatorId], references: [id], onDelete: SetNull)
+  title       String
+  body        String             @db.Text
+  status      AnnouncementStatus @default(DRAFT)
+  publishedAt DateTime?
+  views       Int                @default(0)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
 
-  audiences     AnnouncementAudience[]
+  audiences AnnouncementAudience[]
 
   @@index([status])
   @@index([publishedAt])
 }
 
 model AnnouncementAudience {
-  id              String       @id @default(cuid())
-  announcementId  String
-  announcement    Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
-  roleName        RoleName
+  id             String       @id @default(cuid())
+  announcementId String
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  roleName       RoleName
 
   @@unique([announcementId, roleName])
   @@index([roleName])
 }
 
 model Conversation {
-  id                String                  @id @default(cuid())
-  applicationId     String?
-  application       Application?            @relation(fields: [applicationId], references: [id], onDelete: SetNull)
-  conversationType  ConversationType        @default(DIRECT)
-  title             String?
-  createdAt         DateTime                @default(now())
-  updatedAt         DateTime                @updatedAt
+  id               String           @id @default(cuid())
+  applicationId    String?
+  application      Application?     @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  conversationType ConversationType @default(DIRECT)
+  title            String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
-  participants      ConversationParticipant[]
-  messages          Message[]
+  participants ConversationParticipant[]
+  messages     Message[]
 
   @@index([applicationId])
 }
 
 model ConversationParticipant {
-  id              String        @id @default(cuid())
-  conversationId  String
-  conversation    Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  userId          String
-  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  unreadCount     Int           @default(0)
-  joinedAt        DateTime      @default(now())
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  unreadCount    Int          @default(0)
+  joinedAt       DateTime     @default(now())
 
   @@unique([conversationId, userId])
   @@index([userId])
 }
 
 model Message {
-  id              String        @id @default(cuid())
-  conversationId  String
-  conversation    Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  senderId        String
-  sender          User          @relation("MessageSender", fields: [senderId], references: [id], onDelete: Restrict)
-  body            String        @db.Text
-  attachmentName  String?
-  attachmentSize  String?
-  createdAt       DateTime      @default(now())
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User         @relation("MessageSender", fields: [senderId], references: [id], onDelete: Restrict)
+  body           String       @db.Text
+  attachmentName String?
+  attachmentSize String?
+  createdAt      DateTime     @default(now())
 
   @@index([conversationId, createdAt])
   @@index([senderId])
 }
 
 model Notification {
-  id            String            @id @default(cuid())
+  id            String           @id @default(cuid())
   userId        String
-  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   applicationId String?
-  application   Application?      @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  tone          NotificationTone  @default(INFO)
+  application   Application?     @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  tone          NotificationTone @default(INFO)
   title         String
-  body          String            @db.Text
-  read          Boolean           @default(false)
-  createdAt     DateTime          @default(now())
+  body          String           @db.Text
+  read          Boolean          @default(false)
+  createdAt     DateTime         @default(now())
 
   @@index([userId, read])
   @@index([applicationId])
 }
 
 model SupportTicket {
-  id            String          @id @default(cuid())
-  userId        String
-  reporter      User            @relation("TicketReporter", fields: [userId], references: [id], onDelete: Restrict)
-  assignedToId  String?
-  assignee      User?           @relation("TicketAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
-  subject       String
-  body          String          @db.Text
-  role          RoleName?
-  priority      SupportPriority @default(MEDIUM)
-  status        SupportStatus   @default(OPEN)
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-  closedAt      DateTime?
+  id           String          @id @default(cuid())
+  userId       String
+  reporter     User            @relation("TicketReporter", fields: [userId], references: [id], onDelete: Restrict)
+  assignedToId String?
+  assignee     User?           @relation("TicketAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  subject      String
+  body         String          @db.Text
+  role         RoleName?
+  priority     SupportPriority @default(MEDIUM)
+  status       SupportStatus   @default(OPEN)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  closedAt     DateTime?
 
   @@index([status, priority])
   @@index([userId])
 }
 
 model MessageTemplate {
-  id            String    @id @default(cuid())
-  createdById   String?
-  createdBy     User?     @relation("TemplateAuthor", fields: [createdById], references: [id], onDelete: SetNull)
-  label         String
-  text          String    @db.Text
-  category      String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id          String   @id @default(cuid())
+  createdById String?
+  createdBy   User?    @relation("TemplateAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+  label       String
+  text        String   @db.Text
+  category    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@unique([createdById, label])
   @@index([category])
 }
 
 model CmsPage {
-  id          String   @id @default(cuid())
-  slug        String   @unique
-  title       String
-  content     String   @db.Text
-  published   Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  title     String
+  content   String   @db.Text
+  published Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([published])
 }
@@ -781,36 +795,53 @@ model PlatformSetting {
 }
 
 model Payment {
-  id            String        @id @default(cuid())
-  applicationId String
-  application   Application   @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  payerId       String
-  payer         User          @relation("Payer", fields: [payerId], references: [id], onDelete: Restrict)
-  amount        Decimal       @db.Decimal(10, 2)
-  currency      String        @default("USD")
-  status        PaymentStatus @default(PENDING)
-  reference     String?       @unique
-  paidAt        DateTime?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id                String        @id @default(cuid())
+  applicationId     String
+  application       Application   @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  studentId         String
+  student           User          @relation("StudentPayments", fields: [studentId], references: [id], onDelete: Restrict)
+  amount            Decimal       @db.Decimal(10, 2)
+  amountPaid        Decimal?      @db.Decimal(10, 2)
+  currency          String        @default("USD")
+  paymentMethod     PaymentMethod
+  transactionId     String?
+  proofImage        String?
+  remarks           String?
+  status            PaymentStatus @default(AWAITING_PAYMENT)
+  gateway           String?       @default("MANUAL")
+  paymentDeadline   DateTime?
+  submittedAt       DateTime?
+  verifiedById      String?
+  verifiedBy        User?         @relation("VerifiedPayments", fields: [verifiedById], references: [id], onDelete: SetNull)
+  verifiedAt        DateTime?
+  verificationNotes String?
+  rejectionReason   String?
+  internalNotes     String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
 
   @@index([applicationId])
-  @@index([payerId, status])
+  @@index([studentId, status])
+  @@index([transactionId])
+  @@index([verifiedById])
+  @@index([status])
+  @@index([submittedAt])
+  @@index([createdAt])
 }
 
 model CalendarEvent {
-  id            String           @id @default(cuid())
-  hospitalId    String?
-  hospital      HospitalProfile? @relation(fields: [hospitalId], references: [id], onDelete: SetNull)
-  createdById   String?
-  createdBy     User?            @relation("EventCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  title         String
-  description   String?          @db.Text
-  startAt       DateTime
-  endAt         DateTime
-  location      String?
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
+  id          String           @id @default(cuid())
+  hospitalId  String?
+  hospital    HospitalProfile? @relation(fields: [hospitalId], references: [id], onDelete: SetNull)
+  createdById String?
+  createdBy   User?            @relation("EventCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  title       String
+  description String?          @db.Text
+  startAt     DateTime
+  endAt       DateTime
+  location    String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
 
   @@index([hospitalId, startAt])
   @@index([createdById])
@@ -841,15 +872,15 @@ model PartnerRegistration {
 }
 
 model AuditLog {
-  id          String   @id @default(cuid())
-  actorId     String?
-  actor       User?    @relation("Actor", fields: [actorId], references: [id], onDelete: SetNull)
-  action      String
-  entityType  String
-  entityId    String
-  details     Json?
-  ipAddress   String?
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  actorId    String?
+  actor      User?    @relation("Actor", fields: [actorId], references: [id], onDelete: SetNull)
+  action     String
+  entityType String
+  entityId   String
+  details    Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
 
   @@index([entityType, entityId])
   @@index([actorId, createdAt])

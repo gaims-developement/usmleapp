@@ -2,7 +2,9 @@ import type { AuthUser, LoginResult } from '@/types/rbac'
 
 export interface Session {
   user: AuthUser
-  token: string
+  accessToken: string
+  refreshToken: string
+  refreshTokenExpiresAt: string
 }
 
 const STORAGE_KEY = 'imgprep.session'
@@ -19,6 +21,18 @@ export const sessionService = {
 
   set(session: Session): void {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(session))
+  },
+
+  setTokens(tokens: {
+    accessToken: string
+    refreshToken: string
+    refreshTokenExpiresAt: string
+  }): Session | null {
+    const current = this.get()
+    if (!current) return null
+    const next: Session = { ...current, ...tokens }
+    this.set(next)
+    return next
   },
 
   update(patch: Partial<AuthUser>): Session | null {
@@ -38,5 +52,13 @@ export const sessionService = {
 export function readSession(): { result: LoginResult; session: Session } | null {
   const session = sessionService.get()
   if (!session) return null
-  return { result: { user: session.user, token: session.token }, session }
+  return {
+    result: {
+      user: session.user,
+      accessToken: session.accessToken,
+      refreshToken: session.refreshToken,
+      refreshTokenExpiresAt: session.refreshTokenExpiresAt,
+    },
+    session,
+  }
 }

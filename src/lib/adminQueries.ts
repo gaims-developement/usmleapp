@@ -21,6 +21,7 @@ import {
   fetchAnnouncements,
   fetchAuditLogs,
   fetchCmsPages,
+  fetchDocument,
   fetchNotifications,
   fetchOpsKpis,
   fetchPlatformSettings,
@@ -32,6 +33,8 @@ import {
   fetchSupportTickets,
   forwardApplication,
   markAllNotificationsRead,
+  removeHospital,
+  setDocStatus,
   setHospitalStatus,
   setProgramStatus,
   setTicketStatus,
@@ -47,7 +50,7 @@ import {
 } from '@/services/adminService'
 import type { AnnouncementStatus, SupportStatus } from '@/mocks/admin/content'
 import type { HospitalStatus } from '@/mocks/admin/people'
-import type { ProgramStatus } from '@/mocks/admin/operations'
+import type { DocVerificationStatus, ProgramStatus } from '@/mocks/admin/operations'
 
 export const adminQueryKeys = {
   kpis: ['admin', 'kpis'] as const,
@@ -62,6 +65,7 @@ export const adminQueryKeys = {
   reviewers: ['admin', 'reviewers'] as const,
   programs: ['admin', 'programs'] as const,
   documents: ['admin', 'documents'] as const,
+  document: (id: string) => ['admin', 'documents', id] as const,
   payments: ['admin', 'payments'] as const,
   announcements: ['admin', 'announcements'] as const,
   cms: ['admin', 'cms'] as const,
@@ -110,6 +114,23 @@ export const useAdminPrograms = () =>
 
 export const useAdminDocuments = () =>
   useQuery({ queryKey: adminQueryKeys.documents, queryFn: fetchAdminDocuments })
+
+export const useAdminDocument = (id: string | null) =>
+  useQuery({
+    queryKey: adminQueryKeys.document(id ?? ''),
+    queryFn: () => fetchDocument(id ?? ''),
+    enabled: !!id,
+  })
+
+export function useSetDocStatus() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, status }: { id: string; status: DocVerificationStatus }) => setDocStatus(id, status),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: adminQueryKeys.documents })
+    },
+  })
+}
 
 export const useAdminPayments = () =>
   useQuery({ queryKey: adminQueryKeys.payments, queryFn: fetchAdminPayments })
@@ -195,6 +216,17 @@ export const useSetHospitalStatus = () => {
   return useMutation({
     mutationFn: (input: { hospitalId: string; status: HospitalStatus }) =>
       setHospitalStatus(input.hospitalId, input.status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: adminQueryKeys.hospitals })
+      queryClient.invalidateQueries({ queryKey: adminQueryKeys.opsKpis })
+    },
+  })
+}
+
+export const useRemoveHospital = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (hospitalId: string) => removeHospital(hospitalId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: adminQueryKeys.hospitals })
       queryClient.invalidateQueries({ queryKey: adminQueryKeys.opsKpis })

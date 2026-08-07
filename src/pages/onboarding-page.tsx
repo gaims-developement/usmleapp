@@ -4,13 +4,12 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, CheckCircle2, GraduationCap, Sparkles, Stethoscope } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useCompleteOnboarding } from '@/lib/queries'
-import { electiveCities, electiveSpecialties } from '@/mocks/electives'
 import { Button } from '@/components/ui/button'
 import { ChipSelect } from '@/components/ui/chip-select'
 import { Progress } from '@/components/ui/progress'
 import { cn } from '@/lib/utils'
 
-const STEPS = ['About you', 'Elective preferences', 'Location preferences', 'Your timeline', 'Review & finish']
+const STEPS = ['About you', 'Your goals', 'Your timeline', 'Review & finish']
 
 const roles = ['Medical student', 'Graduated']
 const visaOptions = ['F-1 student visa', 'J-1 exchange visa', 'H-1B visa', 'No visa yet', 'Other']
@@ -24,9 +23,7 @@ interface OnboardingForm {
   role: string
   graduationYear: number | null
   visaStatus: string
-  electives: string[]
   goals: string[]
-  locations: string[]
   travel: string
   earliestStart: string
   durationPreference: number | null
@@ -34,7 +31,7 @@ interface OnboardingForm {
 }
 
 export function OnboardingPage() {
-  const { user, completeOnboarding } = useAuth()
+  const { completeOnboarding } = useAuth()
   const finish = useCompleteOnboarding()
   const navigate = useNavigate()
   const [step, setStep] = useState(0)
@@ -42,9 +39,7 @@ export function OnboardingPage() {
     role: '',
     graduationYear: null,
     visaStatus: '',
-    electives: user?.electives ?? [],
     goals: [],
-    locations: user?.locations ?? [],
     travel: '',
     earliestStart: '',
     durationPreference: null,
@@ -61,39 +56,27 @@ export function OnboardingPage() {
     step === 0
       ? Boolean(form.role && form.graduationYear && form.visaStatus)
       : step === 1
-        ? form.electives.length > 0 && form.goals.length > 0
+        ? form.goals.length > 0
         : step === 2
-          ? form.locations.length > 0 && Boolean(form.travel)
-          : step === 3
-            ? Boolean(form.earliestStart && form.durationPreference)
-            : form.docsConfirmed
+          ? Boolean(form.earliestStart && form.durationPreference)
+          : form.docsConfirmed
 
   async function handleNext() {
     if (step < STEPS.length - 1) {
       setStep(s => s + 1)
       return
     }
-    await finish.mutateAsync({
-      role: form.role,
-      graduationYear: form.graduationYear ?? 0,
-      visaStatus: form.visaStatus,
-      goals: form.goals,
-      electives: form.electives,
-      locations: form.locations,
-      earliestStart: form.earliestStart,
-      durationPreference: form.durationPreference ?? 4,
-      travelReady: form.travel === 'Ready to travel anytime',
-    })
-    completeOnboarding({
+    const payload = {
       graduationYear: form.graduationYear ?? undefined,
       visaStatus: form.visaStatus,
       goals: form.goals,
-      electives: form.electives,
-      locations: form.locations,
       earliestStart: form.earliestStart,
       durationPreference: form.durationPreference ?? 4,
       travelReady: form.travel === 'Ready to travel anytime',
-    })
+      onboarded: true,
+    }
+    await finish.mutateAsync(payload)
+    await completeOnboarding(payload)
     navigate('/dashboard/student', { replace: true })
   }
 
@@ -187,18 +170,18 @@ export function OnboardingPage() {
                 selected={form.visaStatus ? [form.visaStatus] : []}
                 onToggle={v => update({ visaStatus: form.visaStatus === v ? '' : v })}
               />
+              <ChipSelect
+                label="Travel availability"
+                hint="Select one"
+                options={travelOptions}
+                selected={form.travel ? [form.travel] : []}
+                onToggle={v => update({ travel: form.travel === v ? '' : v })}
+              />
             </div>
           )}
 
           {step === 1 && (
             <div className="space-y-7">
-              <ChipSelect
-                label="Preferred electives"
-                hint="Select all that apply"
-                options={electiveSpecialties}
-                selected={form.electives}
-                onToggle={v => update({ electives: toggleIn(form.electives, v) })}
-              />
               <ChipSelect
                 label="What are your goals?"
                 hint="Select all that apply"
@@ -210,25 +193,6 @@ export function OnboardingPage() {
           )}
 
           {step === 2 && (
-            <div className="space-y-7">
-              <ChipSelect
-                label="Preferred locations in the USA"
-                hint="Select all that apply"
-                options={electiveCities}
-                selected={form.locations}
-                onToggle={v => update({ locations: toggleIn(form.locations, v) })}
-              />
-              <ChipSelect
-                label="Travel availability"
-                hint="Select one"
-                options={travelOptions}
-                selected={form.travel ? [form.travel] : []}
-                onToggle={v => update({ travel: form.travel === v ? '' : v })}
-              />
-            </div>
-          )}
-
-          {step === 3 && (
             <div className="space-y-7">
               <div>
                 <label className="mb-1.5 block text-sm font-semibold text-ink-900">Earliest start month</label>
@@ -257,7 +221,7 @@ export function OnboardingPage() {
             </div>
           )}
 
-          {step === 4 && (
+          {step === 3 && (
             <div className="space-y-6">
               <div className="rounded-2xl border border-ink-200 bg-ink-50/50 p-5">
                 <h3 className="flex items-center gap-2 text-sm font-bold text-ink-900">
@@ -269,8 +233,6 @@ export function OnboardingPage() {
                   <SummaryItem label="Visa status" value={form.visaStatus} />
                   <SummaryItem label="Earliest start" value={form.earliestStart ? formatMonth(form.earliestStart) : '—'} />
                   <SummaryItem label="Preferred length" value={form.durationPreference ? `${form.durationPreference} weeks` : '—'} />
-                  <SummaryItem label="Electives" value={form.electives.join(', ')} />
-                  <SummaryItem label="Locations" value={form.locations.join(', ')} />
                   <SummaryItem label="Goals" value={form.goals.join(', ')} />
                 </dl>
               </div>

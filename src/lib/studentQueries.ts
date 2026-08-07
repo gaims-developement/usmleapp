@@ -1,13 +1,14 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { studentService } from '@/services/studentService'
 import type { StudentSettings } from '@/services/studentService'
-import type { AuthUser } from '@/types/rbac'
+import type { UpdateUserInput } from '@/services/userService'
 
 export const studentQueryKeys = {
   resources: ['resources'] as const,
   announcements: ['announcements'] as const,
   profile: ['profile'] as const,
   settings: ['settings'] as const,
+  notifications: ['student', 'notifications'] as const,
 }
 
 export function useStudyResources() {
@@ -28,7 +29,7 @@ export function useAnnouncements() {
 export function useUpdateProfile() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (patch: Partial<AuthUser>) => studentService.updateProfile(patch),
+    mutationFn: (patch: UpdateUserInput) => studentService.updateProfile(patch),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: studentQueryKeys.profile })
     },
@@ -48,6 +49,23 @@ export function useUpdateStudentSettings() {
     mutationFn: (patch: Partial<StudentSettings>) => studentService.updateSettings(patch),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: studentQueryKeys.settings })
+    },
+  })
+}
+
+export function useStudentNotifications() {
+  return useQuery({
+    queryKey: studentQueryKeys.notifications,
+    queryFn: studentService.fetchNotifications,
+  })
+}
+
+export function useMarkStudentNotificationsRead() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => studentService.markAllNotificationsRead(),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: studentQueryKeys.notifications })
     },
   })
 }

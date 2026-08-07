@@ -25,6 +25,7 @@ import {
   adminPrograms,
   type AdminApplication,
   type DocRecord,
+  type DocVerificationStatus,
   type PaymentRecord,
   type ProgramRecord,
   type ProgramStatus,
@@ -54,6 +55,7 @@ import {
 } from '@/mocks/admin/ops'
 import { adminStudents, type AdminStudent } from '@/mocks/admin/students'
 import { platformSettings, type PlatformSettings } from '@/mocks/admin/settings'
+import { addStudentNotification } from '@/services/studentService'
 
 const latency = (ms = 300) => new Promise(resolve => setTimeout(resolve, ms))
 
@@ -63,6 +65,7 @@ let tickets: SupportTicket[] = [...supportTickets]
 let hospitals: HospitalRecord[] = [...adminHospitals]
 let programs: ProgramRecord[] = [...adminPrograms]
 let notifications: AdminNotification[] = [...adminNotifications]
+let documents: DocRecord[] = [...adminDocuments]
 
 const today = () => new Date().toISOString().slice(0, 10)
 
@@ -123,7 +126,32 @@ export async function fetchAdminPrograms(): Promise<ProgramRecord[]> {
 
 export async function fetchAdminDocuments(): Promise<DocRecord[]> {
   await latency(300)
-  return [...adminDocuments]
+  return [...documents]
+}
+
+export async function fetchDocument(id: string): Promise<DocRecord | null> {
+  await latency(250)
+  return documents.find(d => d.id === id) ?? null
+}
+
+export async function setDocStatus(id: string, status: DocVerificationStatus): Promise<DocRecord[]> {
+  await latency(400)
+  const target = documents.find(d => d.id === id)
+  if (!target) return [...documents]
+  documents = documents.map(d => (d.id === id ? { ...d, status } : d))
+  const firstName = target.owner.split(' ')[0]
+  if (status === 'verified') {
+    addStudentNotification(
+      'Document approved ✅',
+      `Hey ${firstName}, your ${target.document.toLowerCase()} has been verified. You're all set!`,
+    )
+  } else if (status === 'rejected') {
+    addStudentNotification(
+      'Document needs attention ⚠️',
+      `Hi ${firstName}, your ${target.document.toLowerCase()} couldn't be verified. Please re-upload a clearer copy.`,
+    )
+  }
+  return [...documents]
 }
 
 export async function fetchAdminPayments(): Promise<PaymentRecord[]> {
@@ -269,6 +297,14 @@ export async function setHospitalStatus(
   if (!hospital) throw new Error(`Hospital ${hospitalId} not found`)
   hospital.status = status
   return { ...hospital }
+}
+
+export async function removeHospital(hospitalId: string): Promise<{ removed: boolean }> {
+  await latency(300)
+  const index = hospitals.findIndex(h => h.id === hospitalId)
+  if (index === -1) throw new Error(`Hospital ${hospitalId} not found`)
+  hospitals.splice(index, 1)
+  return { removed: true }
 }
 
 export interface NewProgramInput {

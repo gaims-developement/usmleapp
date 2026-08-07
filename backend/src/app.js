@@ -1,7 +1,7 @@
 import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
-import { env } from './config/env.js'
+import { allowedOrigins, env } from './config/env.js'
 import { apiRouter } from './routes/index.js'
 import { requestLogger } from './middleware/request-logger.middleware.js'
 import { notFoundMiddleware } from './middleware/not-found.middleware.js'
@@ -14,7 +14,12 @@ app.disable('x-powered-by')
 app.use(helmet())
 app.use(
   cors({
-    origin: env.CLIENT_URL,
+    origin(origin, callback) {
+      // Allow same-origin / non-browser clients (no Origin header) through.
+      if (!origin) return callback(null, true)
+      if (allowedOrigins.has(origin)) return callback(null, true)
+      return callback(new Error(`Origin not allowed by CORS: ${origin}`))
+    },
     credentials: true,
   }),
 )

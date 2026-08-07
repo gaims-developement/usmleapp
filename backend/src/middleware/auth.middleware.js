@@ -37,6 +37,10 @@ export async function authenticate(req, _res, next) {
       throw new AppError('Account no longer exists', 401, 'USER_NOT_FOUND')
     }
 
+    if (user.deletedAt) {
+      throw new AppError('This account has been deactivated', 403, 'ACCOUNT_DEACTIVATED')
+    }
+
     req.user = {
       id: user.id,
       sub: user.id,

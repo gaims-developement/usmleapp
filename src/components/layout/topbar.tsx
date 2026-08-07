@@ -31,10 +31,15 @@ import {
   useDoctorNotifications,
   useMarkDoctorNotificationsRead,
 } from '@/lib/doctorQueries'
+import {
+  useMarkStudentNotificationsRead,
+  useStudentNotifications,
+} from '@/lib/studentQueries'
 import { cn } from '@/lib/utils'
 import type { NotificationTone } from '@/mocks/admin/ops'
 import type { HospitalNotification } from '@/mocks/hospital/notifications'
 import type { DoctorNotification } from '@/mocks/doctor/notifications'
+import type { StudentNotification } from '@/mocks/student/notifications'
 
 const toneIcon: Record<NotificationTone, { icon: LucideIcon; className: string }> = {
   success: { icon: Check, className: 'bg-brand-50 text-brand-600' },
@@ -57,6 +62,13 @@ const doctorTone: Record<DoctorNotification['type'], NotificationTone> = {
   evaluation: 'warning',
   certificate: 'success',
   lor: 'success',
+  system: 'critical',
+}
+
+const studentTone: Record<StudentNotification['type'], NotificationTone> = {
+  document: 'success',
+  application: 'info',
+  rotation: 'warning',
   system: 'critical',
 }
 
@@ -154,14 +166,17 @@ export function NotificationCenter() {
   const isReviewer = user?.role === 'REVIEWER'
   const isHospital = user?.role === 'HOSPITAL'
   const isDoctor = user?.role === 'DOCTOR'
+  const isStudent = user?.role === 'STUDENT'
   const adminNotifications = useNotifications()
   const reviewerNotifications = useReviewerNotifications()
   const hospitalNotifications = useHospitalNotifications()
   const doctorNotifications = useDoctorNotifications()
+  const studentNotifications = useStudentNotifications()
   const markAdminRead = useMarkNotificationsRead()
   const markReviewerRead = useMarkReviewerNotificationsRead()
   const markHospitalRead = useMarkHospitalNotificationsRead()
   const markDoctorRead = useMarkDoctorNotificationsRead()
+  const markStudentRead = useMarkStudentNotificationsRead()
 
   const source = isReviewer
     ? reviewerNotifications
@@ -169,14 +184,18 @@ export function NotificationCenter() {
       ? hospitalNotifications
       : isDoctor
         ? doctorNotifications
-        : adminNotifications
+        : isStudent
+          ? studentNotifications
+          : adminNotifications
   const markRead = isReviewer
     ? markReviewerRead
     : isHospital
       ? markHospitalRead
       : isDoctor
         ? markDoctorRead
-        : markAdminRead
+        : isStudent
+          ? markStudentRead
+          : markAdminRead
   const unread = (source.data ?? []).filter(n => !n.read).length
 
   const items = (source.data ?? []).map(n => {
@@ -184,6 +203,7 @@ export function NotificationCenter() {
       return { id: n.id, read: n.read, title: n.title, body: n.body, time: n.time, icon: toneIcon[n.tone] }
     }
     const tone =
+      studentTone[n.type as keyof typeof studentTone] ??
       doctorTone[n.type as keyof typeof doctorTone] ??
       hospitalTone[n.type as keyof typeof hospitalTone] ??
       'info'

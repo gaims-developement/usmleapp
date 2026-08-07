@@ -36,7 +36,7 @@ export function BrowseElectivesPage() {
     <div className="space-y-6">
       <PageHeader
         title="Browse electives"
-        subtitle="Find verified U.S. clinical electives matched to your specialty and location preferences."
+        subtitle="See every verified U.S. rotation. Use filters to narrow down, then apply to any program you like."
       />
 
       <Filters filters={filters} onChange={handleChange} />

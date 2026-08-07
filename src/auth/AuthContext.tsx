@@ -9,9 +9,10 @@ import type {
   RoleId,
 } from '@/types/rbac'
 import { roleById } from '@/roles/roles'
-import { authService, makeMockToken } from '@/services/authService'
+import { authService } from '@/services/authService'
 import { sessionService } from '@/services/sessionService'
 import { userService } from '@/services/userService'
+import { addStudentNotification } from '@/services/studentService'
 import type { CreateUserInput } from '@/services/userService'
 
 export interface AuthContextValue {
@@ -22,7 +23,7 @@ export interface AuthContextValue {
   login: (credentials: LoginCredentials) => Promise<LoginResult>
   logout: () => Promise<void>
   signUp: (input: CreateUserInput) => Promise<AuthUser>
-  completeOnboarding: (patch: Partial<AuthUser>) => void
+  completeOnboarding: (patch: Partial<AuthUser>) => Promise<void>
   hasPermission: (permission: Permission) => boolean
   hasRole: (...roles: RoleId[]) => boolean
 }
@@ -46,22 +47,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const signUp = useCallback(async (input: CreateUserInput) => {
-    const created = userService.create({ ...input, role: input.role ?? 'STUDENT' })
-    const token = makeMockToken(created)
-    sessionService.set({ user: created, token })
-    setUser(created)
-    return created
+    const result = await authService.register({
+      name: input.name,
+      email: input.email,
+      password: input.password ?? '',
+      college: input.college,
+      dob: input.dob,
+      electives: input.electives,
+      locations: input.locations,
+    })
+    setUser(result.user)
+    addStudentNotification(
+      'Welcome to the club! 🎉',
+      `We're thrilled to have you, ${input.name.split(' ')[0]}. Finish your profile to start exploring U.S. clinical rotations.`,
+    )
+    return result.user
   }, [])
 
-  const completeOnboarding = useCallback((patch: Partial<AuthUser>) => {
-    setUser(prev => {
-      if (!prev) return prev
-      const next: AuthUser = { ...prev, onboarded: true, ...patch }
-      userService.update(prev.id, next)
-      sessionService.update(next)
-      return next
-    })
-  }, [])
+  const completeOnboarding = useCallback(async (patch: Partial<AuthUser>) => {
+    if (!user) return
+    const updated = await userService.update(user.id, patch)
+    setUser(updated)
+    sessionService.update(updated)
+  }, [user])
 
   const role = user ? roleById(user.role) : null
   const permissions = user ? roleById(user.role).permissions : NO_PERMISSIONS

@@ -1,21 +1,29 @@
 import { useMemo, useState } from 'react'
-import { Building2, Plus, Search } from 'lucide-react'
+import { Ban, Building2, Eye, Plus, Search, ShieldCheck, Trash2 } from 'lucide-react'
 import { PageHeader } from '@/components/ui/page-header'
 import { HospitalCodeManagement } from '@/components/admin/hospital-code-management'
-import { ButtonLink } from '@/components/ui/button'
+import { Button, ButtonLink } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
+import { Modal, ConfirmDialog } from '@/components/ui/modal'
 import { PageLoader } from '@/components/ui/spinner'
-import { hospitalStatusMeta, tierMeta, StatusBadge } from '@/components/ui/status-badge'
-import { useAdminHospitals } from '@/lib/adminQueries'
+import { hospitalStatusMeta, StatusBadge } from '@/components/ui/status-badge'
+import { useToast } from '@/components/ui/toast'
+import { useAdminHospitals, useRemoveHospital, useSetHospitalStatus } from '@/lib/adminQueries'
 import { formatDate } from '@/lib/utils'
 import type { HospitalRecord } from '@/mocks/admin/people'
 
 export function SuperAdminHospitalsPage() {
   const hospitals = useAdminHospitals()
+  const setStatus = useSetHospitalStatus()
+  const remove = useRemoveHospital()
+  const toast = useToast()
+
   const [search, setSearch] = useState('')
-  const [status, setStatus] = useState('all')
+  const [status, setStatusFilter] = useState('all')
+  const [reviewing, setReviewing] = useState<HospitalRecord | null>(null)
+  const [removing, setRemoving] = useState<HospitalRecord | null>(null)
 
   const filtered = useMemo(() => {
     let result = hospitals.data ?? []
@@ -33,7 +41,7 @@ export function SuperAdminHospitalsPage() {
 
   const totals = hospitals.data ?? []
   const active = totals.filter(h => h.status === 'active').length
-  const premier = totals.filter(h => h.tier === 'premier').length
+  const paused = totals.filter(h => h.status === 'paused').length
   const onboarding = totals.filter(h => h.status === 'onboarding').length
 
   const columns: DataTableColumn<HospitalRecord>[] = [
@@ -55,14 +63,6 @@ export function SuperAdminHospitalsPage() {
       ),
       sortValue: r => r.name,
     },
-    {
-      key: 'tier',
-      header: 'Tier',
-      cell: r => {
-        const meta = tierMeta(r.tier)
-        return <StatusBadge label={meta.label} tone={meta.tone} />
-      },
-    },
     { key: 'programs', header: 'Programs', cell: r => r.programs, align: 'right' },
     { key: 'doctors', header: 'Doctors', cell: r => r.doctors, align: 'right' },
     { key: 'students', header: 'Students', cell: r => r.students, align: 'right' },
@@ -82,13 +82,24 @@ export function SuperAdminHospitalsPage() {
       },
     },
     { key: 'joined', header: 'Joined', cell: r => formatDate(r.joinedAt), align: 'right' },
+    {
+      key: 'actions',
+      header: '',
+      align: 'right',
+      cell: r => (
+        <Button variant="outline" size="sm" onClick={() => setReviewing(r)}>
+          <Eye className="size-3.5" aria-hidden />
+          Review
+        </Button>
+      ),
+    },
   ]
 
   return (
     <div>
       <PageHeader
         title="Hospitals"
-        subtitle="Partner hospitals, their programs, and onboarding status."
+        subtitle="Partner hospitals, their programs, and enlisting status."
         actions={
           <ButtonLink to="/dashboard/super-admin/hospitals" size="sm">
             <Plus className="size-4" aria-hidden />
@@ -103,8 +114,8 @@ export function SuperAdminHospitalsPage() {
           <p className="mt-2 font-display text-2xl font-bold text-ink-900">{active}</p>
         </div>
         <div className="rounded-3xl border border-ink-200 bg-white p-5 shadow-soft">
-          <p className="text-sm text-ink-500">Premier partners</p>
-          <p className="mt-2 font-display text-2xl font-bold text-ink-900">{premier}</p>
+          <p className="text-sm text-ink-500">Paused</p>
+          <p className="mt-2 font-display text-2xl font-bold text-amber-600">{paused}</p>
         </div>
         <div className="rounded-3xl border border-ink-200 bg-white p-5 shadow-soft">
           <p className="text-sm text-ink-500">Onboarding</p>
@@ -123,7 +134,7 @@ export function SuperAdminHospitalsPage() {
             aria-label="Search hospitals"
           />
         </div>
-        <Select value={status} onChange={e => setStatus(e.target.value)} className="w-44" aria-label="Filter by status">
+        <Select value={status} onChange={e => setStatusFilter(e.target.value)} className="w-44" aria-label="Filter by status">
           <option value="all">All statuses</option>
           <option value="active">Active</option>
           <option value="paused">Paused</option>
@@ -136,6 +147,120 @@ export function SuperAdminHospitalsPage() {
       </div>
 
       <HospitalCodeManagement />
+
+      <Modal
+        open={reviewing !== null}
+        onClose={() => setReviewing(null)}
+        title={reviewing?.name ?? 'Review hospital'}
+        description={reviewing ? `${reviewing.city}, ${reviewing.state}` : undefined}
+      >
+        {reviewing && (
+          <div className="space-y-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusBadge
+                label={hospitalStatusMeta(reviewing.status).label}
+                tone={hospitalStatusMeta(reviewing.status).tone}
+              />
+            </div>
+
+            <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
+              {(
+                [
+                  ['Email', reviewing.email],
+                  ['Phone', reviewing.phone],
+                  ['Programs', String(reviewing.programs)],
+                  ['Doctors', String(reviewing.doctors)],
+                  ['Students', String(reviewing.students)],
+                  ['Rating', String(reviewing.rating || '—')],
+                  ['Joined', formatDate(reviewing.joinedAt)],
+                ] as [string, string][]
+              ).map(([k, v]) => (
+                <div key={k} className="border-b border-ink-100 pb-2">
+                  <dt className="text-xs font-bold uppercase tracking-wide text-ink-400">{k}</dt>
+                  <dd className="mt-0.5 text-sm font-semibold text-ink-900">{v}</dd>
+                </div>
+              ))}
+            </dl>
+
+            <div className="flex flex-wrap gap-2 border-t border-ink-100 pt-4">
+              {reviewing.status === 'active' ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={setStatus.isPending}
+                  onClick={() =>
+                    setStatus.mutate(
+                      { hospitalId: reviewing.id, status: 'paused' },
+                      {
+                        onSuccess: () => {
+                          toast.success('Enlisting disabled', `${reviewing.name} will no longer be listed for new rotations.`)
+                          setReviewing(null)
+                        },
+                        onError: () => toast.error('Could not update hospital'),
+                      },
+                    )
+                  }
+                >
+                  <Ban className="size-3.5" aria-hidden />
+                  Disable enlisting
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  disabled={setStatus.isPending}
+                  onClick={() =>
+                    setStatus.mutate(
+                      { hospitalId: reviewing.id, status: 'active' },
+                      {
+                        onSuccess: () => {
+                          toast.success('Enlisting enabled', `${reviewing.name} can now accept new rotations.`)
+                          setReviewing(null)
+                        },
+                        onError: () => toast.error('Could not update hospital'),
+                      },
+                    )
+                  }
+                >
+                  <ShieldCheck className="size-3.5" aria-hidden />
+                  Enable enlisting
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="!text-red-600 hover:!bg-red-50"
+                disabled={remove.isPending}
+                onClick={() => setRemoving(reviewing)}
+              >
+                <Trash2 className="size-3.5" aria-hidden />
+                Remove hospital
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <ConfirmDialog
+        open={removing !== null}
+        onClose={() => setRemoving(null)}
+        onConfirm={() => {
+          if (!removing) return
+          remove.mutate(removing.id, {
+            onSuccess: () => {
+              toast.success('Hospital removed', `${removing.name} has been removed.`)
+              setRemoving(null)
+              setReviewing(null)
+            },
+            onError: () => toast.error('Could not remove hospital'),
+          })
+        }}
+        title="Remove hospital"
+        description={`Are you sure you want to remove ${removing?.name ?? 'this hospital'}? This cannot be undone.`}
+        confirmLabel="Remove hospital"
+        cancelLabel="Cancel"
+        tone="danger"
+        loading={remove.isPending}
+      />
     </div>
   )
 }

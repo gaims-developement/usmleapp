@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   ClipboardList,
   Clock,
+  CreditCard,
   FileText,
 } from 'lucide-react'
 import { useApplications, useWithdrawApplication } from '@/lib/queries'
@@ -17,6 +18,7 @@ import { Button } from '@/components/ui/button'
 import { ButtonLink } from '@/components/ui/button'
 import { formatDate } from '@/components/electives/elective-card'
 import { cn } from '@/lib/utils'
+import { paymentMethodLabels } from '@/mocks/applications'
 
 export function ApplicationTrackerPage() {
   const { id } = useParams<{ id: string }>()
@@ -144,6 +146,13 @@ export function ApplicationTrackerPage() {
                 value={`Starts ${formatDate(app.startDate)} · ${app.durationWeeks} weeks`}
               />
               <DetailRow icon={CheckCircle2} label="Submitted" value={formatDate(app.submittedAt)} />
+              {app.paymentMethod && (
+                <DetailRow
+                  icon={CreditCard}
+                  label="Payment method"
+                  value={paymentMethodLabels[app.paymentMethod]}
+                />
+              )}
               <DetailRow
                 icon={FileText}
                 label="Documents included"

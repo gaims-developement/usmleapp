@@ -1,7 +1,6 @@
 import { partnerHospitals, type PartnerHospital } from '@/mocks/partners/hospitals'
 import { partnerDoctors, type PartnerDoctor } from '@/mocks/partners/doctors'
 import { partnerReviewers, type PartnerReviewer } from '@/mocks/partners/reviewers'
-import { userService } from '@/services/userService'
 import type { RoleId } from '@/types/rbac'
 
 export type PartnerType = 'hospital' | 'doctor' | 'reviewer'
@@ -98,8 +97,6 @@ function doctorById(id: string): PartnerDoctor | undefined {
 
 function assertEmailFree(email: string): void {
   const normalized = email.trim().toLowerCase()
-  const inUsers = userService.findByEmail(normalized)
-  if (inUsers) throw new Error('An account with this email already exists.')
   const inRegistries = [...hospitals, ...doctors, ...reviewers].some(
     r => r.email.toLowerCase() === normalized,
   )
@@ -337,42 +334,18 @@ export const partnerService = {
     if (hospital) {
       hospital.status = 'active'
       delete hospital.reviewMessage
-      if (!userService.findByEmail(hospital.email)) {
-        userService.create({
-          name: hospital.name,
-          email: hospital.email,
-          password: hospital.password ?? '',
-          role: 'HOSPITAL',
-        })
-      }
       return requestFromHospital(hospital)
     }
     const doctor = doctors.find(d => `dreq-${d.id}` === id)
     if (doctor) {
       doctor.status = 'active'
       delete doctor.reviewMessage
-      if (!userService.findByEmail(doctor.email)) {
-        userService.create({
-          name: doctor.name,
-          email: doctor.email,
-          password: doctor.password ?? '',
-          role: 'DOCTOR',
-        })
-      }
       return requestFromDoctor(doctor)
     }
     const reviewer = reviewers.find(r => `rreq-${r.id}` === id)
     if (reviewer) {
       reviewer.status = 'active'
       delete reviewer.reviewMessage
-      if (!userService.findByEmail(reviewer.email)) {
-        userService.create({
-          name: reviewer.name,
-          email: reviewer.email,
-          password: reviewer.password ?? '',
-          role: 'REVIEWER',
-        })
-      }
       return requestFromReviewer(reviewer)
     }
     throw new Error('Approval request not found.')

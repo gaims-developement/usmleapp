@@ -1,7 +1,8 @@
 import { announcements, type Announcement } from '@/mocks/announcements'
 import { studyResources, type StudyResource } from '@/mocks/study-resources'
+import { studentNotifications, type StudentNotification } from '@/mocks/student/notifications'
 import { sessionService } from '@/services/sessionService'
-import { userService } from '@/services/userService'
+import { userService, type UpdateUserInput } from '@/services/userService'
 import type { AuthUser } from '@/types/rbac'
 
 export interface StudentNotificationPrefs {
@@ -32,6 +33,19 @@ let settings: StudentSettings = {
 
 const latency = (ms = 350) => new Promise(resolve => setTimeout(resolve, ms))
 
+let notifications: StudentNotification[] = studentNotifications.map(n => ({ ...n }))
+
+export function addStudentNotification(title: string, message: string) {
+  notifications.unshift({
+    id: `sn-${Date.now()}`,
+    type: 'document',
+    title,
+    message,
+    time: 'Just now',
+    read: false,
+  })
+}
+
 export const studentService = {
   async fetchStudyResources(): Promise<StudyResource[]> {
     await latency()
@@ -46,13 +60,11 @@ export const studentService = {
     })
   },
 
-  async updateProfile(patch: Partial<AuthUser>): Promise<AuthUser> {
-    await latency(500)
+  async updateProfile(patch: UpdateUserInput): Promise<AuthUser> {
     const session = sessionService.get()
     if (!session) throw new Error('You must be signed in to update your profile.')
-    const updated = userService.update(session.user.id, patch)
-    if (!updated) throw new Error('User not found.')
-    sessionService.update(patch)
+    const updated = await userService.update(session.user.id, patch)
+    sessionService.update(patch as Partial<AuthUser>)
     return updated
   },
 
@@ -74,5 +86,16 @@ export const studentService = {
       notifications: { ...settings.notifications },
       privacy: { ...settings.privacy },
     }
+  },
+
+  async fetchNotifications(): Promise<StudentNotification[]> {
+    await latency()
+    return notifications.map(n => ({ ...n }))
+  },
+
+  async markAllNotificationsRead(): Promise<StudentNotification[]> {
+    await latency(200)
+    notifications = notifications.map(n => ({ ...n, read: true }))
+    return notifications.map(n => ({ ...n }))
   },
 }

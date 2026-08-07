@@ -38,6 +38,19 @@ export function DashboardPage() {
 
   const firstInitial = user?.name?.[0] ?? 'I'
 
+  const preferredSpecialties = new Set((user?.electives ?? []).map(s => s.toLowerCase()))
+  const preferredLocations = new Set(user?.locations ?? [])
+  const isPreferred = (e: { specialty: string; city: string; state: string }) =>
+    [...preferredSpecialties].some(
+      p => e.specialty.toLowerCase().includes(p) || p.includes(e.specialty.toLowerCase()),
+    ) || preferredLocations.has(`${e.city}, ${e.state}`)
+  const recommended = [...(electives.data ?? [])].sort((a, b) => {
+    const aMatch = isPreferred(a)
+    const bMatch = isPreferred(b)
+    if (aMatch !== bMatch) return aMatch ? -1 : 1
+    return b.rating - a.rating
+  })
+
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -64,14 +77,19 @@ export function DashboardPage() {
         <div className="space-y-4 lg:col-span-2">
           <SectionHeading
             title="Recommended for you"
-            subtitle="Top-rated electives based on your profile"
+            subtitle="Your preferred specialties and locations first, plus other options"
             action={{ to: '/electives', label: 'Browse all' }}
           />
           <div className="grid gap-4 sm:grid-cols-2">
-            {(electives.data ?? []).slice(0, 4).map(e => (
+            {recommended.slice(0, 6).map(e => (
               <ElectiveCard key={e.id} elective={e} />
             ))}
           </div>
+          <p className="text-xs text-ink-500">
+            These are suggestions based on the preferences you chose at signup — they are not
+            automatic applications. To rotate at any program, open it and submit an application
+            yourself.
+          </p>
         </div>
 
         <div className="space-y-8">
