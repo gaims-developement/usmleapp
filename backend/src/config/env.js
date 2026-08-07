@@ -1,0 +1,34 @@
+import 'dotenv/config'
+import { z } from 'zod'
+
+const envSchema = z.object({
+  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  PORT: z.coerce.number().int().positive().default(5000),
+  CLIENT_URL: z.string().url().default('http://127.0.0.1:5173'),
+  APP_URL: z.string().url().default('http://127.0.0.1:5173'),
+  DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
+  JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
+  JWT_EXPIRES_IN: z.string().default('15m'),
+  JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET must be at least 32 characters'),
+  JWT_REFRESH_EXPIRES_IN: z.string().default('30d'),
+  EMAIL_VERIFICATION_EXPIRES_IN: z.string().default('24h'),
+  PASSWORD_RESET_EXPIRES_IN: z.string().default('1h'),
+  CLOUDINARY_CLOUD_NAME: z.string().optional().default(''),
+  CLOUDINARY_API_KEY: z.string().optional().default(''),
+  CLOUDINARY_API_SECRET: z.string().optional().default(''),
+})
+
+const parsed = envSchema.safeParse(process.env)
+
+if (!parsed.success) {
+  console.error('Invalid environment configuration')
+  console.error(parsed.error.flatten().fieldErrors)
+  process.exit(1)
+}
+
+if (parsed.data.JWT_SECRET === parsed.data.JWT_REFRESH_SECRET) {
+  console.error('JWT_SECRET and JWT_REFRESH_SECRET must be different secrets')
+  process.exit(1)
+}
+
+export const env = parsed.data

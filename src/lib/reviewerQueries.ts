@@ -1,0 +1,177 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  approveApplication,
+  fetchConversations,
+  fetchMessageTemplates,
+  fetchReviewerApplication,
+  fetchReviewerApplications,
+  fetchReviewerNotifications,
+  fetchReviewerProfile,
+  forwardToHospital,
+  markAllReviewerNotificationsRead,
+  markConversationRead,
+  rejectApplication,
+  requestChanges,
+  saveDraft,
+  sendMessage,
+  sendMessageToStudent,
+  setDocumentNote,
+  setDocumentVerification,
+  startReview,
+  type ReviewDraft,
+} from '@/services/reviewerService'
+import type { DocVerification, ReviewDocType } from '@/mocks/reviewer/applications'
+
+export const reviewerQueryKeys = {
+  applications: ['reviewer', 'applications'] as const,
+  application: (id: string) => ['reviewer', 'application', id] as const,
+  profile: ['reviewer', 'profile'] as const,
+  conversations: ['reviewer', 'conversations'] as const,
+  templates: ['reviewer', 'templates'] as const,
+  notifications: ['reviewer', 'notifications'] as const,
+}
+
+const invalidateApplication = (queryClient: ReturnType<typeof useQueryClient>, id: string) => {
+  queryClient.invalidateQueries({ queryKey: reviewerQueryKeys.applications })
+  queryClient.invalidateQueries({ queryKey: reviewerQueryKeys.application(id) })
+}
+
+export const useReviewerApplications = () =>
+  useQuery({ queryKey: reviewerQueryKeys.applications, queryFn: fetchReviewerApplications })
+
+export const useReviewerApplication = (id: string) =>
+  useQuery({ queryKey: reviewerQueryKeys.application(id), queryFn: () => fetchReviewerApplication(id) })
+
+export const useReviewerProfile = () =>
+  useQuery({ queryKey: reviewerQueryKeys.profile, queryFn: fetchReviewerProfile })
+
+export const useConversations = () =>
+  useQuery({ queryKey: reviewerQueryKeys.conversations, queryFn: fetchConversations })
+
+export const useMessageTemplates = () =>
+  useQuery({ queryKey: reviewerQueryKeys.templates, queryFn: fetchMessageTemplates })
+
+export const useReviewerNotifications = () =>
+  useQuery({ queryKey: reviewerQueryKeys.notifications, queryFn: fetchReviewerNotifications })
+
+export const useStartReview = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (applicationId: string) => startReview(applicationId),
+    onSuccess: (app) => invalidateApplication(queryClient, app.id),
+  })
+}
+
+export const useSaveDraft = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ applicationId, draft }: { applicationId: string; draft: ReviewDraft }) =>
+      saveDraft(applicationId, draft),
+    onSuccess: (app) => invalidateApplication(queryClient, app.id),
+  })
+}
+
+export const useApproveApplication = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ applicationId, draft }: { applicationId: string; draft?: ReviewDraft }) =>
+      approveApplication(applicationId, draft),
+    onSuccess: (app) => invalidateApplication(queryClient, app.id),
+  })
+}
+
+export const useRejectApplication = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ applicationId, draft, message }: { applicationId: string; draft?: ReviewDraft; message?: string }) =>
+      rejectApplication(applicationId, draft, message),
+    onSuccess: (app) => {
+      invalidateApplication(queryClient, app.id)
+      queryClient.invalidateQueries({ queryKey: reviewerQueryKeys.conversations })
+    },
+  })
+}
+
+export const useRequestChanges = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ applicationId, draft, message }: { applicationId: string; draft?: ReviewDraft; message?: string }) =>
+      requestChanges(applicationId, draft, message),
+    onSuccess: (app) => {
+      invalidateApplication(queryClient, app.id)
+      queryClient.invalidateQueries({ queryKey: reviewerQueryKeys.conversations })
+    },
+  })
+}
+
+export const useForwardToHospital = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ applicationId, draft }: { applicationId: string; draft?: ReviewDraft }) =>
+      forwardToHospital(applicationId, draft),
+    onSuccess: (app) => {
+      invalidateApplication(queryClient, app.id)
+      queryClient.invalidateQueries({ queryKey: reviewerQueryKeys.conversations })
+    },
+  })
+}
+
+export const useSetDocumentVerification = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ applicationId, docName, verification }: { applicationId: string; docName: ReviewDocType; verification: DocVerification }) =>
+      setDocumentVerification(applicationId, docName, verification),
+    onSuccess: (app) => invalidateApplication(queryClient, app.id),
+  })
+}
+
+export const useSetDocumentNote = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ applicationId, docName, note }: { applicationId: string; docName: ReviewDocType; note: string }) =>
+      setDocumentNote(applicationId, docName, note),
+    onSuccess: (app) => invalidateApplication(queryClient, app.id),
+  })
+}
+
+export const useMarkReviewerNotificationsRead = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => markAllReviewerNotificationsRead(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: reviewerQueryKeys.notifications })
+    },
+  })
+}
+
+export const useSendMessage = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ conversationId, text, attachment }: { conversationId: string; text: string; attachment?: { name: string; size: string } }) =>
+      sendMessage(conversationId, text, attachment),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: reviewerQueryKeys.conversations })
+    },
+  })
+}
+
+export const useSendMessageToStudent = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ studentId, applicationId, text }: { studentId: string; applicationId: string; text: string }) =>
+      sendMessageToStudent(studentId, applicationId, text),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: reviewerQueryKeys.conversations })
+    },
+  })
+}
+
+export const useMarkConversationRead = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (conversationId: string) => markConversationRead(conversationId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: reviewerQueryKeys.conversations })
+    },
+  })
+}

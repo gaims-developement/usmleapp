@@ -1,0 +1,53 @@
+import type { AppNavItem } from '@/components/layout/app-layout'
+import {
+  BarChart3,
+  Building2,
+  ClipboardList,
+  CreditCard,
+  FileText,
+  FolderOpen,
+  GraduationCap,
+  LayoutDashboard,
+  LifeBuoy,
+  Megaphone,
+  ScrollText,
+  Settings,
+  ShieldCheck,
+  Stethoscope,
+  User,
+  UserCheck,
+  Users,
+} from 'lucide-react'
+
+export const superAdminNav: AppNavItem[] = [
+  { to: '/dashboard/super-admin', label: 'Dashboard', icon: LayoutDashboard, section: 'Overview', end: true },
+  { to: '/dashboard/super-admin/analytics', label: 'Analytics', icon: BarChart3, section: 'Overview' },
+  { to: '/dashboard/super-admin/users', label: 'Users', icon: Users, section: 'Management' },
+  { to: '/dashboard/super-admin/applications', label: 'Applications', icon: ClipboardList, section: 'Management' },
+  { to: '/dashboard/super-admin/hospitals', label: 'Hospitals', icon: Building2, section: 'Management' },
+  { to: '/dashboard/super-admin/doctors', label: 'Doctors', icon: Stethoscope, section: 'Management' },
+  { to: '/dashboard/super-admin/reviewers', label: 'Reviewers', icon: UserCheck, section: 'Management' },
+  { to: '/dashboard/super-admin/programs', label: 'Programs', icon: GraduationCap, section: 'Management' },
+  { to: '/dashboard/super-admin/documents', label: 'Documents', icon: FolderOpen, section: 'Management' },
+  { to: '/dashboard/super-admin/payments', label: 'Payments', icon: CreditCard, section: 'Management' },
+  { to: '/dashboard/super-admin/announcements', label: 'Announcements', icon: Megaphone, section: 'Content' },
+  { to: '/dashboard/super-admin/cms', label: 'CMS', icon: FileText, section: 'Content' },
+  { to: '/dashboard/super-admin/roles', label: 'Roles & Permissions', icon: ShieldCheck, section: 'System' },
+  { to: '/dashboard/super-admin/audit-logs', label: 'Audit Logs', icon: ScrollText, section: 'System' },
+  { to: '/dashboard/super-admin/support', label: 'Support', icon: LifeBuoy, section: 'System' },
+  { to: '/dashboard/super-admin/settings', label: 'Settings', icon: Settings, section: 'System' },
+]
+
+export const adminNav: AppNavItem[] = [
+  { to: '/dashboard/admin', label: 'Dashboard', icon: LayoutDashboard, section: 'Overview', end: true },
+  { to: '/dashboard/admin/applications', label: 'Applications', icon: ClipboardList, section: 'Operations' },
+  { to: '/dashboard/admin/students', label: 'Students', icon: Users, section: 'Operations' },
+  { to: '/dashboard/admin/hospitals', label: 'Hospitals', icon: Building2, section: 'Operations' },
+  { to: '/dashboard/admin/doctors', label: 'Doctors', icon: Stethoscope, section: 'Operations' },
+  { to: '/dashboard/admin/reviewers', label: 'Reviewers', icon: UserCheck, section: 'Operations' },
+  { to: '/dashboard/admin/programs', label: 'Elective Programs', icon: GraduationCap, section: 'Operations' },
+  { to: '/dashboard/admin/announcements', label: 'Announcements', icon: Megaphone, section: 'Communication' },
+  { to: '/dashboard/admin/support', label: 'Support Tickets', icon: LifeBuoy, section: 'Communication' },
+  { to: '/dashboard/admin/reports', label: 'Reports', icon: BarChart3, section: 'Insights' },
+  { to: '/dashboard/admin/profile', label: 'Profile', icon: User, section: 'Account', end: true },
+]
