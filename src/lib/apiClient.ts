@@ -193,3 +193,7 @@ export function apiPatch<T>(path: string, body?: unknown, options?: RequestOptio
 export function apiPut<T>(path: string, body?: unknown, options?: RequestOptions): Promise<T> {
   return apiRequest<T>(path, { ...options, method: 'PUT', body })
 }
+
+export function apiDelete<T>(path: string, options?: RequestOptions): Promise<T> {
+  return apiRequest<T>(path, { ...options, method: 'DELETE' })
+}

@@ -173,6 +173,7 @@ model User {
   onboarded       Boolean   @default(false)
   emailVerifiedAt DateTime?
   deletedAt       DateTime?
+  isDemo          Boolean   @default(false)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -266,6 +267,7 @@ model StudentProfile {
   locations    StudentLocationPreference[]
   goals        StudentGoal[]
   applications Application[]
+  documents    StudentDocument[]
 
   @@index([college])
 }
@@ -297,6 +299,24 @@ model StudentGoal {
   value            String
 
   @@unique([studentProfileId, value])
+  @@index([studentProfileId])
+}
+
+model StudentDocument {
+  id               String         @id @default(cuid())
+  studentProfileId String
+  studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  name             String
+  category         String
+  required         Boolean        @default(true)
+  status           String         @default("missing") // missing, uploaded, expiring
+  fileName         String?
+  uploadedAt       DateTime?
+  expiresAt        DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@unique([studentProfileId, name])
   @@index([studentProfileId])
 }
 
@@ -475,6 +495,8 @@ model Application {
   doctorProfileId   String?
   doctorProfile     DoctorProfile?    @relation(fields: [doctorProfileId], references: [id], onDelete: SetNull)
   status            ApplicationStatus @default(DRAFT)
+  startDate         DateTime?
+  durationWeeks     Int?
   submittedAt       DateTime?
   reviewedAt        DateTime?
   reviewMinutes     Int?
@@ -790,6 +812,7 @@ model PlatformSetting {
   siteName        String   @default("USMLEApp")
   supportEmail    String?
   maintenanceMode Boolean  @default(false)
+  enableDemoData  Boolean  @default(true)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }

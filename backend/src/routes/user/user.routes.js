@@ -145,6 +145,88 @@ userRouter.delete(
   }),
 )
 
+userRouter.get(
+  '/students',
+  requireRoles('SUPER_ADMIN', 'ADMIN'),
+  asyncHandler(async (req, res) => {
+    const students = await prisma.user.findMany({
+      where: {
+        isDemo: req.user.isDemo,
+        role: { name: 'STUDENT' },
+      },
+      include: {
+        studentProfile: true,
+      },
+    })
+    const mapped = students.map(u => ({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      college: u.studentProfile?.college ?? 'Medical University',
+      graduationYear: u.studentProfile?.graduationYear ?? 2027,
+      visaStatus: u.studentProfile?.visaStatus ?? 'F1',
+      onboarded: u.onboarded,
+      isDemo: u.isDemo,
+    }))
+    return res.json({ success: true, data: mapped })
+  }),
+)
+
+userRouter.get(
+  '/reviewers',
+  requireRoles('SUPER_ADMIN', 'ADMIN'),
+  asyncHandler(async (req, res) => {
+    const reviewers = await prisma.user.findMany({
+      where: {
+        isDemo: req.user.isDemo,
+        role: { name: 'REVIEWER' },
+      },
+      include: {
+        reviewerProfile: true,
+      },
+    })
+    const mapped = reviewers.map(u => ({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      specialty: u.reviewerProfile?.specialty ?? 'General',
+      department: u.reviewerProfile?.department ?? 'Education',
+      onboarded: u.onboarded,
+      isDemo: u.isDemo,
+    }))
+    return res.json({ success: true, data: mapped })
+  }),
+)
+
+userRouter.get(
+  '/hospitals',
+  requireRoles('SUPER_ADMIN', 'ADMIN'),
+  asyncHandler(async (req, res) => {
+    const hospitals = await prisma.user.findMany({
+      where: {
+        isDemo: req.user.isDemo,
+        role: { name: 'HOSPITAL' },
+      },
+      include: {
+        hospitalProfile: true,
+      },
+    })
+    const mapped = hospitals.map(u => ({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      organizationName: u.hospitalProfile?.name ?? u.name,
+      city: u.hospitalProfile?.city ?? 'Boston',
+      state: u.hospitalProfile?.state ?? 'MA',
+      country: u.hospitalProfile?.country ?? 'USA',
+      status: u.hospitalProfile?.status ?? 'active',
+      onboarded: u.onboarded,
+      isDemo: u.isDemo,
+    }))
+    return res.json({ success: true, data: mapped })
+  }),
+)
+
 userRouter.post(
   '/:id/reactivate',
   validate(reactivateParamsSchema),

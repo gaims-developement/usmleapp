@@ -29,6 +29,11 @@ const envSchema = z.object({
   CLOUDINARY_CLOUD_NAME: z.string().optional().default(''),
   CLOUDINARY_API_KEY: z.string().optional().default(''),
   CLOUDINARY_API_SECRET: z.string().optional().default(''),
+  ENABLE_DEMO_DATA: z
+    .string()
+    .optional()
+    .default('true')
+    .transform(value => value.toLowerCase() === 'true'),
 })
 
 const parsed = envSchema.safeParse(process.env)

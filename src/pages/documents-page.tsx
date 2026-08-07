@@ -9,7 +9,7 @@ import {
   Trash2,
   UploadCloud,
 } from 'lucide-react'
-import type { UserDocument } from '@/mocks/documents'
+import type { UserDocument } from '@/lib/types'
 import { useDocuments, useRemoveDocument, useUploadDocument } from '@/lib/queries'
 import { PageHeader } from '@/components/ui/page-header'
 import { PageLoader } from '@/components/ui/spinner'

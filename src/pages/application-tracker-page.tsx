@@ -17,8 +17,8 @@ import { applicationStatusMeta, StatusBadge } from '@/components/ui/status-badge
 import { Button } from '@/components/ui/button'
 import { ButtonLink } from '@/components/ui/button'
 import { formatDate } from '@/components/electives/elective-card'
-import { cn } from '@/lib/utils'
-import { paymentMethodLabels } from '@/mocks/applications'
+import { cn, paymentMethodLabels } from '@/lib/utils'
+import type { Application } from '@/lib/types'
 
 export function ApplicationTrackerPage() {
   const { id } = useParams<{ id: string }>()
@@ -27,7 +27,7 @@ export function ApplicationTrackerPage() {
 
   if (isPending) return <PageLoader label="Loading application…" />
 
-  const app = (data ?? []).find(a => a.id === id)
+  const app = (data as Application[] | undefined)?.find(a => a.id === id)
 
   if (!app) {
     return (

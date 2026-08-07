@@ -1,7 +1,7 @@
 import { useSearchParams } from 'react-router-dom'
 import { SearchX } from 'lucide-react'
 import { useElectives } from '@/lib/queries'
-import type { ElectiveFilters } from '@/lib/api'
+import type { ElectiveFilters } from '@/lib/mocks'
 import { PageHeader } from '@/components/ui/page-header'
 import { PageLoader } from '@/components/ui/spinner'
 import { ElectiveFilters as Filters } from '@/components/electives/elective-filters'

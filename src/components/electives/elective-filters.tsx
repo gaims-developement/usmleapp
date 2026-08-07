@@ -1,6 +1,6 @@
 import { Search } from 'lucide-react'
 import { electiveCities, electiveDurations, electiveSpecialties } from '@/mocks/electives'
-import type { ElectiveFilters } from '@/lib/api'
+import type { ElectiveFilters } from '@/lib/mocks'
 import { cn } from '@/lib/utils'
 
 const selectClass =

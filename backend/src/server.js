@@ -27,3 +27,4 @@ process.on('uncaughtException', error => {
   logger.error('Uncaught exception', error)
   process.exit(1)
 })
+// Trigger reload

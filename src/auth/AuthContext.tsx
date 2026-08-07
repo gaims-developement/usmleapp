@@ -14,6 +14,8 @@ import { sessionService } from '@/services/sessionService'
 import { userService } from '@/services/userService'
 import { addStudentNotification } from '@/services/studentService'
 import type { CreateUserInput } from '@/services/userService'
+import { adminStudents, type AdminStudent } from '@/mocks/admin/students'
+
 
 export interface AuthContextValue {
   user: AuthUser | null
@@ -61,6 +63,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       'Welcome to the club! 🎉',
       `We're thrilled to have you, ${input.name.split(' ')[0]}. Finish your profile to start exploring U.S. clinical rotations.`,
     )
+
+    try {
+      const storedStudentsRaw = localStorage.getItem('usmle_admin_students')
+      const currentStudents = storedStudentsRaw ? JSON.parse(storedStudentsRaw) : [...adminStudents]
+      
+      const exists = currentStudents.some((s: any) => s.email.toLowerCase() === input.email.toLowerCase())
+      if (!exists) {
+        const newAdminStudent: AdminStudent = {
+          id: result.user.id,
+          name: input.name,
+          email: input.email,
+          country: 'India',
+          school: input.college ?? 'Medical School',
+          step1: '—',
+          step2: '—',
+          applications: 0,
+          docsComplete: 0,
+          docsTotal: 6,
+          profileComplete: false,
+          flagged: false,
+          status: 'active',
+          joinedAt: new Date().toISOString().slice(0, 10),
+        }
+        currentStudents.unshift(newAdminStudent)
+        localStorage.setItem('usmle_admin_students', JSON.stringify(currentStudents))
+      }
+    } catch (e) {
+      console.error(e)
+    }
+
     return result.user
   }, [])
 
@@ -69,6 +101,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const updated = await userService.update(user.id, patch)
     setUser(updated)
     sessionService.update(updated)
+
+    try {
+      const storedStudentsRaw = localStorage.getItem('usmle_admin_students')
+      if (storedStudentsRaw) {
+        const currentStudents = JSON.parse(storedStudentsRaw)
+        const targetIdx = currentStudents.findIndex((s: any) => s.email.toLowerCase() === user.email.toLowerCase())
+        if (targetIdx !== -1) {
+          currentStudents[targetIdx].profileComplete = true
+          localStorage.setItem('usmle_admin_students', JSON.stringify(currentStudents))
+        }
+      }
+    } catch (e) {
+      console.error(e)
+    }
   }, [user])
 
   const role = user ? roleById(user.role) : null

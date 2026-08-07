@@ -48,6 +48,7 @@ export async function authenticate(req, _res, next) {
       name: user.name,
       role: user.role?.name ?? 'STUDENT',
       onboarded: user.onboarded,
+      isDemo: user.isDemo,
     }
 
     return next()

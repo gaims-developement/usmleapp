@@ -42,7 +42,7 @@ export function HospitalDoctorsPage() {
   const all = doctors.data ?? []
 
   function handleAdd() {
-    if (!form.name.trim() || !form.specialty.trim() || !form.email.trim()) {
+    if (!form.name?.trim() || !form.specialty?.trim() || !form.email?.trim()) {
       toast.error('Missing fields', 'Name, specialty, and email are required.')
       return
     }

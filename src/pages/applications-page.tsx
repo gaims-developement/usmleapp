@@ -101,7 +101,7 @@ export function ApplicationsPage() {
           {filtered.map(app => (
             <ApplicationCard
               key={app.id}
-              app={app}
+              app={app as any}
               onWithdraw={() => handleWithdraw(app.id)}
               withdrawPending={withdraw.isPending}
             />

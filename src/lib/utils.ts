@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
+import type { PaymentMethod } from './types'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -24,3 +25,13 @@ export function initialsOf(name: string): string {
     .join('')
     .toUpperCase()
 }
+
+export const paymentMethodLabels: Record<PaymentMethod, string> = {
+  razorpay: 'Razorpay',
+  stripe: 'Stripe',
+  card: 'Debit / Credit card',
+  bank_transfer: 'Bank transfer',
+  upi: 'UPI',
+  paypal: 'PayPal',
+}
+

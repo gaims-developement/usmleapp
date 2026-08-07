@@ -4,8 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "dev:backend": "node --watch backend/src/server.js",
+    "dev": "concurrently \"npm:dev:client\" \"npm:dev:backend\"",
+    "dev:client": "vite",
+    "dev:backend": "node --watch backend/src/server.js --enable-source-maps",
     "start:backend": "node backend/src/server.js",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
@@ -48,6 +49,7 @@
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.4",
+    "concurrently": "^8.2.2",
     "oxlint": "^1.75.0",
     "typescript": "~6.0.2",
     "vite": "^8.2.0"

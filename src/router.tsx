@@ -61,6 +61,7 @@ import { AdminAnnouncementsPage } from '@/pages/admin/announcements'
 import { AdminSupportPage } from '@/pages/admin/support'
 import { AdminReportsPage } from '@/pages/admin/reports'
 import { AdminProfilePage } from '@/pages/admin/profile'
+import { DemoDataPage } from '@/pages/admin/demo-data'
 import { ReviewerOverviewPage } from '@/pages/reviewer/overview'
 import { ReviewerApplicationsPage } from '@/pages/reviewer/applications'
 import { ReviewerApplicationDetailPage } from '@/pages/reviewer/application-detail'
@@ -158,6 +159,7 @@ export const router = createBrowserRouter([
               { path: '/dashboard/super-admin/roles', element: <SuperAdminRolesPage /> },
               { path: '/dashboard/super-admin/audit-logs', element: <SuperAdminAuditLogsPage /> },
               { path: '/dashboard/super-admin/support', element: <SuperAdminSupportPage /> },
+              { path: '/dashboard/super-admin/demo-data', element: <DemoDataPage /> },
               { path: '/dashboard/super-admin/settings', element: <SuperAdminSettingsPage /> },
             ],
           },
@@ -179,6 +181,7 @@ export const router = createBrowserRouter([
               { path: '/dashboard/admin/announcements', element: <AdminAnnouncementsPage /> },
               { path: '/dashboard/admin/support', element: <AdminSupportPage /> },
               { path: '/dashboard/admin/reports', element: <AdminReportsPage /> },
+              { path: '/dashboard/admin/demo-data', element: <DemoDataPage /> },
               { path: '/dashboard/admin/profile', element: <AdminProfilePage /> },
             ],
           },

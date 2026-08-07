@@ -91,7 +91,7 @@ export const useDecideApplication = () => {
   return useMutation({
     mutationFn: ({ applicationId, decision, note }: { applicationId: string; decision: HospitalDecision; note: string }) =>
       decideApplication(applicationId, decision, note),
-    onSuccess: (app) => invalidateApplication(queryClient, app.id),
+    onSuccess: (app: any) => invalidateApplication(queryClient, app.id),
   })
 }
 
@@ -100,7 +100,7 @@ export const useScheduleApplication = () => {
   return useMutation({
     mutationFn: ({ applicationId, doctorId, start, end }: { applicationId: string; doctorId: string; start: string; end: string }) =>
       scheduleApplication(applicationId, doctorId, start, end),
-    onSuccess: (app) => invalidateApplication(queryClient, app.id),
+    onSuccess: (app: any) => invalidateApplication(queryClient, app.id),
   })
 }
 
@@ -109,7 +109,7 @@ export const useUpdateInternalNotes = () => {
   return useMutation({
     mutationFn: ({ applicationId, notes }: { applicationId: string; notes: string }) =>
       updateInternalNotes(applicationId, notes),
-    onSuccess: (app) => invalidateApplication(queryClient, app.id),
+    onSuccess: (app: any) => invalidateApplication(queryClient, app.id),
   })
 }
 
@@ -128,7 +128,7 @@ export const useUpdateHospitalProgram = () => {
   return useMutation({
     mutationFn: ({ programId, patch }: { programId: string; patch: Partial<HospitalProgramInput> }) =>
       updateHospitalProgram(programId, patch),
-    onSuccess: (p) => {
+    onSuccess: (p: any) => {
       queryClient.invalidateQueries({ queryKey: hospitalQueryKeys.programs })
       queryClient.invalidateQueries({ queryKey: hospitalQueryKeys.program(p.id) })
     },
@@ -140,7 +140,7 @@ export const useSetProgramStatus = () => {
   return useMutation({
     mutationFn: ({ programId, status }: { programId: string; status: 'published' | 'paused' | 'archived' | 'draft' }) =>
       setProgramStatus(programId, status),
-    onSuccess: (p) => {
+    onSuccess: (p: any) => {
       queryClient.invalidateQueries({ queryKey: hospitalQueryKeys.programs })
       queryClient.invalidateQueries({ queryKey: hospitalQueryKeys.program(p.id) })
     },

@@ -37,6 +37,7 @@ export function serializeUser(user) {
     avatarUrl: user.avatarUrl ?? null,
     role: user.role?.name ?? 'STUDENT',
     onboarded: user.onboarded,
+    isDemo: user.isDemo,
     emailVerified: Boolean(user.emailVerifiedAt),
     emailVerifiedAt: user.emailVerifiedAt?.toISOString() ?? null,
     college: student?.college ?? undefined,
@@ -155,6 +156,7 @@ async function registerStudent(input, meta = {}) {
       passwordHash,
       roleId: studentRole.id,
       onboarded: false,
+      isDemo: false,
       studentProfile: {
         create: {
           college: input.college ?? null,
@@ -279,6 +281,7 @@ async function registerPartner(input) {
       passwordHash,
       roleId: role.id,
       onboarded: true,
+      isDemo: false,
       ...profileData,
     },
     include: userInclude,

@@ -17,6 +17,7 @@ import {
   User,
   UserCheck,
   Users,
+  Database,
 } from 'lucide-react'
 
 export const superAdminNav: AppNavItem[] = [
@@ -35,6 +36,7 @@ export const superAdminNav: AppNavItem[] = [
   { to: '/dashboard/super-admin/roles', label: 'Roles & Permissions', icon: ShieldCheck, section: 'System' },
   { to: '/dashboard/super-admin/audit-logs', label: 'Audit Logs', icon: ScrollText, section: 'System' },
   { to: '/dashboard/super-admin/support', label: 'Support', icon: LifeBuoy, section: 'System' },
+  { to: '/dashboard/super-admin/demo-data', label: 'Demo Data', icon: Database, section: 'System' },
   { to: '/dashboard/super-admin/settings', label: 'Settings', icon: Settings, section: 'System' },
 ]
 
@@ -49,5 +51,6 @@ export const adminNav: AppNavItem[] = [
   { to: '/dashboard/admin/announcements', label: 'Announcements', icon: Megaphone, section: 'Communication' },
   { to: '/dashboard/admin/support', label: 'Support Tickets', icon: LifeBuoy, section: 'Communication' },
   { to: '/dashboard/admin/reports', label: 'Reports', icon: BarChart3, section: 'Insights' },
+  { to: '/dashboard/admin/demo-data', label: 'Demo Data', icon: Database, section: 'System' },
   { to: '/dashboard/admin/profile', label: 'Profile', icon: User, section: 'Account', end: true },
 ]

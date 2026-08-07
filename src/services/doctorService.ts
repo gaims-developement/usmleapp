@@ -73,18 +73,65 @@ let conversations: DoctorConversation[] = doctorConversations.map(c => ({
 }))
 let notifications: DoctorNotification[] = doctorNotifications.map(n => ({ ...n }))
 
-const studentOf = (id: string) => doctorStudentById(id)
+const studentOf = (id: string): DoctorStudent | undefined => {
+  let s = doctorStudents.find(s => s.id === id)
+  if (!s) {
+    const storedStdsRaw = localStorage.getItem('usmle_admin_students')
+    const stds = storedStdsRaw ? JSON.parse(storedStdsRaw) : []
+    const match = stds.find((st: any) => st.id === id)
+    if (match) {
+      s = {
+        id: match.id,
+        name: match.name,
+        country: match.country,
+        medicalSchool: match.school,
+        graduationYear: 2027,
+        usmleProgress: match.step1 !== '—' ? `Step 1 passed (${match.step1})` : 'Not taken',
+        researchExperience: 'None',
+        clinicalExperience: 'None',
+        department: 'Internal Medicine',
+        rotationStart: '2026-10-05',
+        rotationEnd: '2026-11-27',
+        progressCount: 0,
+      }
+    }
+  }
+  return s
+}
 
 export async function fetchDoctorStudents(): Promise<DoctorStudent[]> {
   await latency(300)
-  return doctorStudents.map(s => ({ ...s }))
+  const storedStdsRaw = localStorage.getItem('usmle_admin_students')
+  const extraStds: DoctorStudent[] = []
+  if (storedStdsRaw) {
+    const stds = JSON.parse(storedStdsRaw)
+    for (const match of stds) {
+      if (!doctorStudents.some(s => s.id === match.id) && !doctorStudents.some(s => s.name === match.name)) {
+        extraStds.push({
+          id: match.id,
+          name: match.name,
+          country: match.country,
+          medicalSchool: match.school,
+          graduationYear: 2027,
+          usmleProgress: match.step1 !== '—' ? `Step 1 passed (${match.step1})` : 'Not taken',
+          researchExperience: 'None',
+          clinicalExperience: 'None',
+          department: 'Internal Medicine',
+          rotationStart: '2026-10-05',
+          rotationEnd: '2026-11-27',
+          progressCount: 0,
+        })
+      }
+    }
+  }
+  return [...doctorStudents, ...extraStds]
 }
 
 export async function fetchDoctorStudentDetail(studentId: string): Promise<DoctorStudentDetail> {
   await latency(250)
-  const student = doctorStudentById(studentId)
+  const student = studentOf(studentId)
   if (!student) throw new Error(`Student ${studentId} not found`)
-  const index = doctorStudents.findIndex(s => s.id === studentId)
+  const index = Math.max(0, doctorStudents.findIndex(s => s.id === studentId))
   const attendance = buildAttendance(index, 8)
   return {
     ...student,

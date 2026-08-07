@@ -19,16 +19,17 @@ import {
   Zap,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import { useDocuments, useElective, useSubmitApplication } from '@/lib/queries'
+import { useDocuments, useElective, useSubmitApplication, type ApplicationInput } from '@/lib/queries'
 import { GatewayCheckout } from '@/components/checkout/gateway-checkout'
 import { PageLoader } from '@/components/ui/spinner'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { formatDate } from '@/components/electives/elective-card'
 import { cn } from '@/lib/utils'
-import { paymentMethodLabels, type PaymentMethod } from '@/mocks/applications'
+import { paymentMethodLabels } from '@/lib/utils'
+import type { PaymentMethod } from '@/lib/types'
 
-const STEPS = ['Review', 'Rotation details', 'Payment', 'Documents & submit']
+const STEPS = ['Review', 'Rotation details', 'Documents', 'Payment & submit']
 
 const PAYMENT_OPTIONS: { id: PaymentMethod; label: string; description: string; icon: LucideIcon }[] = [
   { id: 'razorpay', label: 'Razorpay', description: 'Instant, secure online payments', icon: Zap },
@@ -53,6 +54,7 @@ export function ApplyPage() {
   const [duration, setDuration] = useState<number | null>(null)
   const [selectedDocs, setSelectedDocs] = useState<string[]>([])
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null)
+  const [transactionId, setTransactionId] = useState('')
   const [activeGateway, setActiveGateway] = useState<PaymentMethod | null>(null)
 
   const availableDocs = useMemo(
@@ -84,17 +86,19 @@ export function ApplyPage() {
   const canProceedToDocs = eligibilityConfirmed && startDate && duration !== null
 
   const docsSelected = selectedDocs.filter(n => availableDocs.some(d => d.name === n))
-  const canSubmit = docsSelected.length > 0
+  const canSubmit = docsSelected.length > 0 && transactionId.trim() !== '' && paymentMethod !== null
 
   async function handleSubmit() {
     if (!canSubmit || !paymentMethod) return
-    const app = await submit.mutateAsync({
+    const input: ApplicationInput = {
       electiveId: program.id,
       startDate,
       durationWeeks: duration!,
       documentsIncluded: docsSelected,
       paymentMethod,
-    })
+      transactionId,
+    }
+    const app = (await submit.mutateAsync(input)) as unknown as { id: string }
     navigate('/applications', { state: { justApplied: app.id } })
   }
 
@@ -250,6 +254,56 @@ export function ApplyPage() {
         {step === 2 && (
           <div className="space-y-6">
             <div>
+              <h2 className="font-display text-lg font-bold text-ink-900">Attach documents</h2>
+              <p className="mt-1 text-sm text-ink-600">
+                Select from your uploaded documents. You can add more from the Documents page first.
+              </p>
+            </div>
+
+            {missingRequired.length > 0 && (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                <p className="font-semibold">Missing required documents</p>
+                <p className="mt-1 text-xs">{missingRequired.join(', ')}</p>
+                <Link to="/documents" className="mt-2 inline-block text-xs font-bold text-amber-900 underline">
+                  Upload these documents
+                </Link>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              {availableDocs.map(doc => (
+                <label
+                  key={doc.id}
+                  className="flex cursor-pointer items-center gap-3 rounded-xl border border-ink-200 px-4 py-3 transition-colors hover:border-brand-300"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedDocs.includes(doc.name)}
+                    onChange={() => toggleDoc(doc.name)}
+                    className="size-4.5 shrink-0 accent-brand-600"
+                  />
+                  <FileText className="size-4 shrink-0 text-ink-400" aria-hidden />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold text-ink-900">{doc.name}</span>
+                    <span className="block truncate text-xs text-ink-500">{doc.fileName}</span>
+                  </span>
+                </label>
+              ))}
+              {availableDocs.length === 0 && (
+                <p className="rounded-xl border border-dashed border-ink-200 px-4 py-6 text-center text-sm text-ink-500">
+                  You haven&apos;t uploaded any documents yet.{' '}
+                  <Link to="/documents" className="font-semibold text-brand-700">
+                    Go to Documents
+                  </Link>
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {step === 3 && (
+          <div className="space-y-6">
+            <div>
               <h2 className="font-display text-lg font-bold text-ink-900">Select a payment method</h2>
               <p className="mt-1 text-sm text-ink-600">
                 Secure checkout for your rotation. Choose how you&apos;d like to pay.
@@ -308,68 +362,31 @@ export function ApplyPage() {
               })}
             </div>
 
-            {paymentMethod && (
-              <p className="flex items-center gap-2 rounded-xl bg-brand-50 px-4 py-3 text-sm text-brand-800">
-                <CheckCircle2 className="size-4.5 shrink-0 text-brand-600" aria-hidden />
-                Paid {`$${elective.fee.toLocaleString()}`} via {paymentMethodLabels[paymentMethod]}.
-                You can now continue.
-              </p>
+            {paymentMethod && !submit.isPending && (
+              <div className="space-y-3 rounded-2xl border border-brand-200 bg-brand-50/60 p-5">
+                <p className="flex items-center gap-2 text-sm font-semibold text-brand-800">
+                  <CheckCircle2 className="size-4.5 shrink-0 text-brand-600" aria-hidden />
+                  Paid {`$${elective.fee.toLocaleString()}`} via {paymentMethodLabels[paymentMethod]}.
+                </p>
+                <div>
+                  <label htmlFor="transaction-id" className="mb-1.5 block text-sm font-semibold text-ink-900">
+                    Transaction ID / UTR
+                  </label>
+                  <input
+                    id="transaction-id"
+                    value={transactionId}
+                    onChange={e => setTransactionId(e.target.value)}
+                    placeholder="Enter the transaction reference number"
+                    className="w-full rounded-xl border border-ink-200 bg-white px-4 py-3 text-sm outline-none transition-colors focus:border-brand-500"
+                  />
+                </div>
+              </div>
             )}
 
             <p className="flex items-center gap-1.5 text-xs text-ink-500">
               <Lock className="size-3.5 text-brand-600" aria-hidden />
               Payments are encrypted and processed securely. This is a demo checkout.
             </p>
-          </div>
-        )}
-
-        {step === 3 && (
-          <div className="space-y-6">
-            <div>
-              <h2 className="font-display text-lg font-bold text-ink-900">Attach documents</h2>
-              <p className="mt-1 text-sm text-ink-600">
-                Select from your uploaded documents. You can add more from the Documents page first.
-              </p>
-            </div>
-
-            {missingRequired.length > 0 && (
-              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-                <p className="font-semibold">Missing required documents</p>
-                <p className="mt-1 text-xs">{missingRequired.join(', ')}</p>
-                <Link to="/documents" className="mt-2 inline-block text-xs font-bold text-amber-900 underline">
-                  Upload these documents
-                </Link>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              {availableDocs.map(doc => (
-                <label
-                  key={doc.id}
-                  className="flex cursor-pointer items-center gap-3 rounded-xl border border-ink-200 px-4 py-3 transition-colors hover:border-brand-300"
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedDocs.includes(doc.name)}
-                    onChange={() => toggleDoc(doc.name)}
-                    className="size-4.5 shrink-0 accent-brand-600"
-                  />
-                  <FileText className="size-4 shrink-0 text-ink-400" aria-hidden />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold text-ink-900">{doc.name}</span>
-                    <span className="block truncate text-xs text-ink-500">{doc.fileName}</span>
-                  </span>
-                </label>
-              ))}
-              {availableDocs.length === 0 && (
-                <p className="rounded-xl border border-dashed border-ink-200 px-4 py-6 text-center text-sm text-ink-500">
-                  You haven&apos;t uploaded any documents yet.{' '}
-                  <Link to="/documents" className="font-semibold text-brand-700">
-                    Go to Documents
-                  </Link>
-                </p>
-              )}
-            </div>
           </div>
         )}
 
@@ -401,7 +418,7 @@ export function ApplyPage() {
               size="lg"
               className="flex-1"
               disabled={
-                step === 0 ? !eligibilityConfirmed : step === 1 ? !canProceedToDocs : !paymentMethod
+                step === 0 ? !eligibilityConfirmed : step === 1 ? !canProceedToDocs : docsSelected.length === 0
               }
               onClick={() => {
                 if (step === 1) beginIfEmpty()
@@ -410,7 +427,7 @@ export function ApplyPage() {
             >
               {step === 1 ? (
                 <>
-                  Continue to payment <ArrowRight className="size-4" aria-hidden />
+                  Continue to documents <ArrowRight className="size-4" aria-hidden />
                 </>
               ) : (
                 <>

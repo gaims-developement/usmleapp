@@ -9,7 +9,11 @@ import {
   Sparkles,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
-import { useApplications, useDocuments, useElectives } from '@/lib/queries'
+import {
+  useDashboardStats,
+  useRecommendedElectives,
+  useLatestApplications,
+} from '@/lib/dashboardQueries'
 import { PageLoader } from '@/components/ui/spinner'
 import { ElectiveCard } from '@/components/electives/elective-card'
 import { applicationStatusMeta, StatusBadge } from '@/components/ui/status-badge'
@@ -17,39 +21,19 @@ import { formatDate } from '@/components/electives/elective-card'
 import { ButtonLink } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
-const activeStatuses = ['submitted', 'under_review', 'additional_info', 'offered']
-
 export function DashboardPage() {
   const { user } = useAuth()
-  const electives = useElectives({ sort: 'rating' })
-  const apps = useApplications()
-  const docs = useDocuments()
+  const stats = useDashboardStats()
+  const electives = useRecommendedElectives()
+  const applications = useLatestApplications()
 
-  const loading = electives.isPending || apps.isPending || docs.isPending
+  const loading = stats.isPending || electives.isPending || applications.isPending
 
   if (loading) return <PageLoader label="Loading your dashboard…" />
 
-  const applications = apps.data ?? []
-  const documents = docs.data ?? []
-  const active = applications.filter(a => activeStatuses.includes(a.status))
-  const confirmed = applications.filter(a => a.status === 'confirmed')
-  const docsReady = documents.filter(d => d.status === 'uploaded' || d.status === 'expiring').length
-  const requiredDocs = documents.filter(d => d.required).length
-
   const firstInitial = user?.name?.[0] ?? 'I'
-
-  const preferredSpecialties = new Set((user?.electives ?? []).map(s => s.toLowerCase()))
-  const preferredLocations = new Set(user?.locations ?? [])
-  const isPreferred = (e: { specialty: string; city: string; state: string }) =>
-    [...preferredSpecialties].some(
-      p => e.specialty.toLowerCase().includes(p) || p.includes(e.specialty.toLowerCase()),
-    ) || preferredLocations.has(`${e.city}, ${e.state}`)
-  const recommended = [...(electives.data ?? [])].sort((a, b) => {
-    const aMatch = isPreferred(a)
-    const bMatch = isPreferred(b)
-    if (aMatch !== bMatch) return aMatch ? -1 : 1
-    return b.rating - a.rating
-  })
+  const recommended = electives.data ?? []
+  const latestApps = applications.data ?? []
 
   return (
     <div className="space-y-8">
@@ -67,10 +51,20 @@ export function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard icon={ClipboardList} label="Active applications" value={active.length} />
-        <StatCard icon={CheckCircle2} label="Confirmed rotations" value={confirmed.length} tone="brand" />
-        <StatCard icon={FileText} label="Documents ready" value={`${docsReady}/${requiredDocs}`} tone="accent" />
-        <StatCard icon={Sparkles} label="Applications submitted" value={applications.length} tone="violet" />
+        <StatCard icon={ClipboardList} label="Active applications" value={stats.data?.activeApplications ?? 0} />
+        <StatCard
+          icon={CheckCircle2}
+          label="Confirmed rotations"
+          value={stats.data?.confirmedRotations ?? 0}
+          tone="brand"
+        />
+        <StatCard
+          icon={FileText}
+          label="Documents ready"
+          value={`${stats.data?.documentsReady ?? 0}/${stats.data?.requiredDocuments ?? 0}`}
+          tone="accent"
+        />
+        <StatCard icon={Sparkles} label="Applications submitted" value={stats.data?.totalApplications ?? 0} tone="violet" />
       </div>
 
       <div className="grid gap-8 lg:grid-cols-3">
@@ -82,7 +76,7 @@ export function DashboardPage() {
           />
           <div className="grid gap-4 sm:grid-cols-2">
             {recommended.slice(0, 6).map(e => (
-              <ElectiveCard key={e.id} elective={e} />
+              <ElectiveCard key={e.id} elective={e as any} />
             ))}
           </div>
           <p className="text-xs text-ink-500">
@@ -98,12 +92,16 @@ export function DashboardPage() {
             <ol className="mt-4 space-y-3">
               <CheckStep done={true} label="Complete onboarding" />
               <CheckStep
-                done={docsReady === requiredDocs}
+                done={(stats.data?.documentsReady ?? 0) === (stats.data?.requiredDocuments ?? 0)}
                 label="Upload required documents"
-                detail={docsReady < requiredDocs ? `${requiredDocs - docsReady} remaining` : undefined}
+                detail={
+                  (stats.data?.documentsReady ?? 0) < (stats.data?.requiredDocuments ?? 0)
+                    ? `${(stats.data?.requiredDocuments ?? 0) - (stats.data?.documentsReady ?? 0)} remaining`
+                    : undefined
+                }
               />
-              <CheckStep done={applications.length > 0} label="Apply to your first elective" />
-              <CheckStep done={confirmed.length > 0} label="Confirm a rotation" />
+              <CheckStep done={(stats.data?.totalApplications ?? 0) > 0} label="Apply to your first elective" />
+              <CheckStep done={(stats.data?.confirmedRotations ?? 0) > 0} label="Confirm a rotation" />
             </ol>
             <ButtonLink to="/documents" variant="outline" size="sm" className="mt-5 w-full">
               Manage documents
@@ -113,7 +111,7 @@ export function DashboardPage() {
           <div className="rounded-3xl border border-ink-200 bg-white p-6 shadow-soft">
             <SectionHeading title="Application snapshot" subtitle="Your latest statuses" />
             <ul className="mt-4 space-y-3">
-              {applications.slice(0, 3).map(app => {
+              {latestApps.map(app => {
                 const meta = applicationStatusMeta(app.status)
                 return (
                   <li key={app.id}>
@@ -134,7 +132,7 @@ export function DashboardPage() {
                   </li>
                 )
               })}
-              {applications.length === 0 && (
+              {latestApps.length === 0 && (
                 <li className="rounded-xl border border-dashed border-ink-200 px-4 py-6 text-center text-sm text-ink-500">
                   No applications yet —{' '}
                   <Link to="/electives" className="font-semibold text-brand-700">
