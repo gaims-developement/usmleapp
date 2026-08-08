@@ -1,0 +1,14 @@
+# Netlify deployment configuration for the USMLE App frontend.
+#
+# Build the React/Vite app and publish the dist/ folder.
+#
+# Required Netlify environment variable (set in the Netlify dashboard,
+# NOT committed here):
+#   - VITE_API_URL = https://<railway-backend-domain>.up.railway.app/api
+#
+# If VITE_API_URL is missing, the frontend falls back to
+# http://127.0.0.1:5000/api which does not work in production.
+
+[build]
+  command = "npm run build"
+  publish = "dist"

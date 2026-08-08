@@ -1,6 +1,12 @@
 import { sessionService, type Session } from '@/services/sessionService'
 
-const BASE_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://127.0.0.1:5000/api'
+const resolveBaseUrl = (): string => {
+  const configured = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://127.0.0.1:5000/api'
+  const trimmed = configured.replace(/\/+$/, '')
+  return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`
+}
+
+const BASE_URL = resolveBaseUrl()
 const REQUEST_TIMEOUT_MS = 15_000
 
 export interface ApiErrorPayload {

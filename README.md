@@ -191,6 +191,60 @@ npm run prisma:seed       # re-run the DB seed
 
 ---
 
+## Deployment
+
+The app is split into two deployments:
+
+### Backend (Railway)
+
+Deploy this repository to Railway as the backend service. `railway.toml` in the
+repo root makes the service run the Express API (`node backend/src/server.js`)
+with `/api/health` as the health check, and runs `npx prisma generate` during
+the build.
+
+Required Railway environment variables:
+
+| Variable | Value |
+| --- | --- |
+| `DATABASE_URL` | Your Aiven **MySQL** connection string (`mysql://…`) — the Prisma provider is `mysql` |
+| `JWT_SECRET` | Random string ≥ 32 chars |
+| `JWT_REFRESH_SECRET` | Random string ≥ 32 chars, different from `JWT_SECRET` |
+| `NODE_ENV` | `production` |
+| `CLIENT_URL` | `https://<your-netlify-site>.netlify.app` |
+| `CORS_ALLOWED_ORIGINS` | `https://<your-netlify-site>.netlify.app` |
+| `APP_URL` | `https://<your-netlify-site>.netlify.app` |
+| `ENABLE_DEVMODE` | `false` |
+
+> **Important:** the Prisma schema (`prisma/schema.prisma`) declares
+> `provider = "mysql"`. The database on Aiven must therefore be a **MySQL**
+> service. A PostgreSQL service will not work with this schema.
+
+### Frontend (Netlify)
+
+`netlify.toml` sets the build command (`npm run build`) and publish directory
+(`dist`). Set one environment variable in the Netlify dashboard and rebuild:
+
+| Variable | Value |
+| --- | --- |
+| `VITE_API_URL` | `https://<railway-backend-domain>.up.railway.app/api` |
+
+Without `VITE_API_URL` the frontend falls back to `http://127.0.0.1:5000/api`,
+which only works in local development and produces 404/"Request failed" errors
+in production.
+
+### Expected request flow
+
+```
+Registration page
+  → Netlify frontend (built with VITE_API_URL=https://<railway>.up.railway.app/api)
+  → POST https://<railway>.up.railway.app/api/auth/register
+  → Express backend (Railway)
+  → Prisma → MySQL (Aiven)
+  → account created
+```
+
+---
+
 ## Demo accounts (mock logins)
 
 The seed script creates one demo account per role, all sharing the password
