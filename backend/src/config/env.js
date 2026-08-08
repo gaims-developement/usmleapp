@@ -34,6 +34,11 @@ const envSchema = z.object({
     .optional()
     .default('true')
     .transform(value => value.toLowerCase() === 'true'),
+  ENABLE_DEVMODE: z
+    .string()
+    .optional()
+    .default('false')
+    .transform(value => value.toLowerCase() === 'true'),
 })
 
 const parsed = envSchema.safeParse(process.env)

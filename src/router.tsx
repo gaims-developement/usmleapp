@@ -14,6 +14,7 @@ import { RequireStudent } from '@/guards/RequireStudent'
 import { DashboardRoute, RoleDashboardRoute } from '@/guards/RoleDashboardRoute'
 import { LandingPage } from '@/pages/landing-page'
 import { LoginPage } from '@/pages/login-page'
+import { DevModePage } from '@/pages/devmode-page'
 import { SignupPage } from '@/pages/signup-page'
 import { PartnerRegisterPage } from '@/pages/partner-register-page'
 import { PartnerPendingPage } from '@/pages/partner-pending-page'
@@ -107,6 +108,7 @@ export const router = createBrowserRouter([
     ],
   },
   { path: '/login', element: <LoginPage /> },
+  { path: '/devmode', element: <DevModePage /> },
   { path: '/register', element: <SignupPage /> },
   { path: '/signup', element: <SignupPage /> },
   { path: '/partner-register', element: <PartnerRegisterPage /> },

@@ -10,6 +10,7 @@ import { calendarRouter } from './calendar.routes.js'
 import { dashboardRouter } from './dashboard.routes.js'
 import { adminDemoRouter } from './admin-demo.routes.js'
 import { programRouter } from './program.routes.js'
+import { devmodeRouter } from './devmode.routes.js'
 
 export const apiRouter = Router()
 
@@ -24,4 +25,5 @@ apiRouter.use('/calendar-events', calendarRouter)
 apiRouter.use('/dashboard', dashboardRouter)
 apiRouter.use('/admin/demo', adminDemoRouter)
 apiRouter.use('/programs', programRouter)
+apiRouter.use('/devmode', devmodeRouter)
 

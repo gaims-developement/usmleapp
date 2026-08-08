@@ -50,6 +50,7 @@ const PUBLIC_PATHS = new Set([
   '/auth/verify-email',
   '/auth/forgot-password',
   '/auth/reset-password',
+  '/devmode/status',
 ])
 
 function isPublicPath(path: string): boolean {
