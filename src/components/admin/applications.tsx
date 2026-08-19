@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label'
 import { Modal, ConfirmDialog } from '@/components/ui/modal'
 import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { StatusBadge, applicationPriorityMeta, applicationStatusMeta } from '@/components/ui/status-badge'
+import { StatusBadge, applicationStatusMeta } from '@/components/ui/status-badge'
 import { useToast } from '@/components/ui/toast'
 import {
   useAdminReviewers,
@@ -209,7 +209,6 @@ export function ApplicationDetailModal({
 }) {
   if (!application) return null
   const status = applicationStatusMeta(application.status)
-  const priority = applicationPriorityMeta(application.priority)
   const pct = Math.round((application.documentsComplete / application.documentsTotal) * 100)
 
   const rows: [string, string][] = [
@@ -227,7 +226,6 @@ export function ApplicationDetailModal({
       <div className="space-y-5">
         <div className="flex flex-wrap gap-2">
           <StatusBadge label={status.label} tone={status.tone} />
-          <StatusBadge label={priority.label} tone={priority.tone} />
           {application.flagged && <StatusBadge label="Flagged" tone="red" />}
         </div>
         <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">

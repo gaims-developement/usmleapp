@@ -74,7 +74,7 @@ export function ReviewerDocumentsPage() {
 
   function handleVerify(row: DocRow) {
     setVerification.mutate(
-      { applicationId: row.app.id, docName: row.doc.name, verification: 'verified' },
+      { applicationId: row.app.id, documentId: row.doc.applicationDocumentId!, verification: 'verified' },
       {
         onSuccess: () => toast.success('Document verified', `${row.doc.name} for ${row.app.id}.`),
         onError: () => toast.error('Could not update document'),
@@ -84,7 +84,7 @@ export function ReviewerDocumentsPage() {
 
   function handleStatus(row: DocRow, verification: DocVerification, successLabel: string) {
     setVerification.mutate(
-      { applicationId: row.app.id, docName: row.doc.name, verification },
+      { applicationId: row.app.id, documentId: row.doc.applicationDocumentId!, verification },
       {
         onSuccess: () => toast.success(successLabel, `${row.doc.name} for ${row.app.id}.`),
         onError: () => toast.error('Could not update document'),
@@ -240,7 +240,7 @@ export function ReviewerDocumentsPage() {
               onClick={() => {
                 if (!noteTarget) return
                 setNote.mutate(
-                  { applicationId: noteTarget.app.id, docName: noteTarget.doc.name, note: noteText },
+                  { applicationId: noteTarget.app.id, documentId: noteTarget.doc.applicationDocumentId!, note: noteText },
                   {
                     onSuccess: () => {
                       toast.success('Note saved', `${noteTarget.doc.name} updated.`)

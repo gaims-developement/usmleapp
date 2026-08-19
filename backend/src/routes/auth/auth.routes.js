@@ -61,6 +61,68 @@ const registerPartnerSchema = z.object({
     }),
 })
 
+const registerHospitalSchema = z.object({
+  body: z.object({
+    name: z.string().trim().min(2),
+    email: z.string().trim().email(),
+    password: z.string().min(8),
+    organizationName: z.string().trim().min(2).optional(),
+    city: z.string().trim().optional(),
+    state: z.string().trim().optional(),
+    country: z.string().trim().optional(),
+    address: z.string().trim().optional(),
+    website: z.string().trim().optional(),
+    phone: z.string().trim().optional(),
+    description: z.string().trim().optional(),
+    coordinatorName: z.string().trim().optional(),
+    coordinatorEmail: z.string().trim().email().optional(),
+    coordinatorPhone: z.string().trim().optional(),
+  }),
+})
+
+const registerDoctorSchema = z.object({
+  body: z.object({
+    name: z.string().trim().min(2),
+    email: z.string().trim().email(),
+    password: z.string().min(8),
+    hospitalCode: z.string().trim().min(1),
+    departmentName: z.string().trim().min(1).optional(),
+    specialty: z.string().trim().optional(),
+    title: z.string().trim().optional(),
+    licenseNumber: z.string().trim().optional(),
+    phone: z.string().trim().optional(),
+    availability: z.string().trim().optional(),
+  }),
+})
+
+const registerReviewerSchema = z.object({
+  body: z
+    .object({
+      name: z.string().trim().min(2),
+      email: z.string().trim().email(),
+      password: z.string().min(8),
+      hospitalCode: z.string().trim().min(1).optional(),
+      invitationCode: z.string().trim().min(1).optional(),
+      specialty: z.string().trim().optional(),
+      department: z.string().trim().optional(),
+      timezone: z.string().trim().optional(),
+      title: z.string().trim().optional(),
+      institution: z.string().trim().optional(),
+      phone: z.string().trim().optional(),
+      yearsOfExperience: z.coerce.number().int().min(0).max(60).optional(),
+    })
+    .refine(body => Boolean(body.hospitalCode || body.invitationCode), {
+      message: 'hospitalCode is required',
+      path: ['hospitalCode'],
+    }),
+})
+
+const hospitalCodeLookupSchema = z.object({
+  query: z.object({
+    code: z.string().trim().min(1),
+  }),
+})
+
 const refreshSchema = z.object({
   body: z.object({
     refreshToken: z.string().min(1),
@@ -125,6 +187,54 @@ authRouter.post(
     const result = await authService.registerPartner(req.body)
 
     res.status(201).json({ success: true, data: result })
+  }),
+)
+
+authRouter.post(
+  '/register/hospital',
+  validate(registerHospitalSchema),
+  asyncHandler(async (req, res) => {
+    const result = await authService.registerHospital(req.body, {
+      ip: req.ip,
+      userAgent: req.get('user-agent'),
+    })
+
+    res.status(201).json({ success: true, data: result })
+  }),
+)
+
+authRouter.post(
+  '/register/doctor',
+  validate(registerDoctorSchema),
+  asyncHandler(async (req, res) => {
+    const result = await authService.registerDoctor(req.body, {
+      ip: req.ip,
+      userAgent: req.get('user-agent'),
+    })
+
+    res.status(201).json({ success: true, data: result })
+  }),
+)
+
+authRouter.post(
+  '/register/reviewer',
+  validate(registerReviewerSchema),
+  asyncHandler(async (req, res) => {
+    const result = await authService.registerReviewer(req.body, {
+      ip: req.ip,
+      userAgent: req.get('user-agent'),
+    })
+
+    res.status(201).json({ success: true, data: result })
+  }),
+)
+
+authRouter.get(
+  '/hospital-code/lookup',
+  validate(hospitalCodeLookupSchema),
+  asyncHandler(async (req, res) => {
+    const result = await authService.lookupHospitalCode(req.query.code)
+    res.json({ success: true, data: result })
   }),
 )
 

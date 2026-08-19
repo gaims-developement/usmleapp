@@ -1,3 +1,5 @@
+import { apiGet, apiPatch, apiPost } from '@/lib/apiClient'
+import { sessionService } from '@/services/sessionService'
 import {
   attendancePercentage,
   buildAttendance,
@@ -41,6 +43,14 @@ import { doctorNotifications, type DoctorNotification } from '@/mocks/doctor/not
 
 const latency = (ms = 300) => new Promise(resolve => setTimeout(resolve, ms))
 
+/**
+ * Demo accounts keep the mock experience; real (isDemo=false) doctors read
+ * their own live data from the backend.
+ */
+function isDemoUser(): boolean {
+  return sessionService.get()?.user?.isDemo === true
+}
+
 export interface DoctorStudentDetail extends DoctorStudent {
   attendance: AttendanceRecord[]
   attendancePercentage: number
@@ -62,6 +72,15 @@ export interface CertificateJoined extends Certificate {
 export interface LetterJoined extends LetterOfRecommendation {
   student: { id: string; name: string; country: string }
 }
+
+export interface UpcomingRotationStart {
+  student: DoctorStudent
+  date: string
+}
+
+// ---------------------------------------------------------------------------
+// Demo path (mock data)
+// ---------------------------------------------------------------------------
 
 let logbook: LogbookEntry[] = logbookEntries.map(e => ({ ...e }))
 let evaluations: Evaluation[] = doctorEvaluations.map(e => ({ ...e, scores: { ...e.scores } }))
@@ -99,7 +118,12 @@ const studentOf = (id: string): DoctorStudent | undefined => {
   return s
 }
 
-export async function fetchDoctorStudents(): Promise<DoctorStudent[]> {
+function joinedStudent(id: string) {
+  const s = studentOf(id)
+  return { id, name: s?.name ?? 'Unknown', country: s?.country ?? '—' }
+}
+
+async function mockFetchDoctorStudents(): Promise<DoctorStudent[]> {
   await latency(300)
   const storedStdsRaw = localStorage.getItem('usmle_admin_students')
   const extraStds: DoctorStudent[] = []
@@ -127,7 +151,7 @@ export async function fetchDoctorStudents(): Promise<DoctorStudent[]> {
   return [...doctorStudents, ...extraStds]
 }
 
-export async function fetchDoctorStudentDetail(studentId: string): Promise<DoctorStudentDetail> {
+async function mockFetchDoctorStudentDetail(studentId: string): Promise<DoctorStudentDetail> {
   await latency(250)
   const student = studentOf(studentId)
   if (!student) throw new Error(`Student ${studentId} not found`)
@@ -141,41 +165,31 @@ export async function fetchDoctorStudentDetail(studentId: string): Promise<Docto
   }
 }
 
-export async function fetchDoctorProfile(): Promise<DoctorProfile> {
+async function mockFetchDoctorProfile(): Promise<DoctorProfile> {
   await latency(200)
   return { ...doctorProfile }
 }
 
-export async function fetchTodaySchedule(): Promise<ScheduleItem[]> {
+async function mockFetchTodaySchedule(): Promise<ScheduleItem[]> {
   await latency(200)
   return todaySchedule.map(s => ({ ...s, studentIds: s.studentIds ? [...s.studentIds] : undefined }))
 }
 
-export interface UpcomingRotationStart {
-  student: DoctorStudent
-  date: string
-}
-
-export async function fetchUpcomingRotationStarts(): Promise<UpcomingRotationStart[]> {
+async function mockFetchUpcomingRotationStarts(): Promise<UpcomingRotationStart[]> {
   await latency(200)
   return upcomingRotationStarts
     .map(u => ({ student: studentOf(u.studentId)!, date: u.date }))
     .sort((a, b) => a.date.localeCompare(b.date))
 }
 
-export async function fetchLogbookEntries(): Promise<LogbookEntryJoined[]> {
+async function mockFetchLogbookEntries(): Promise<LogbookEntryJoined[]> {
   await latency(300)
   return logbook
     .map(entry => ({ ...entry, student: joinedStudent(entry.studentId) }))
     .sort((a, b) => b.date.localeCompare(a.date))
 }
 
-function joinedStudent(id: string) {
-  const s = studentOf(id)
-  return { id, name: s?.name ?? 'Unknown', country: s?.country ?? '—' }
-}
-
-export async function setLogbookStatus(entryId: string, status: LogbookStatus, comments?: string): Promise<LogbookEntryJoined> {
+async function mockSetLogbookStatus(entryId: string, status: LogbookStatus, comments?: string): Promise<LogbookEntryJoined> {
   await latency(300)
   const entry = logbook.find(e => e.id === entryId)
   if (!entry) throw new Error(`Entry ${entryId} not found`)
@@ -184,7 +198,7 @@ export async function setLogbookStatus(entryId: string, status: LogbookStatus, c
   return { ...entry, student: joinedStudent(entry.studentId) }
 }
 
-export async function fetchEvaluations(): Promise<EvaluationJoined[]> {
+async function mockFetchEvaluations(): Promise<EvaluationJoined[]> {
   await latency(300)
   return evaluations
     .map(e => ({ ...e, scores: { ...e.scores }, student: joinedStudent(e.studentId) }))
@@ -194,16 +208,7 @@ export async function fetchEvaluations(): Promise<EvaluationJoined[]> {
     })
 }
 
-export interface EvaluationDraft {
-  scores: EvaluationScores
-  overallPerformance: number
-  strengths: string
-  areasForImprovement: string
-  overallComments: string
-  finalRecommendation: FinalRecommendation
-}
-
-export async function saveEvaluation(evaluationId: string, draft: EvaluationDraft): Promise<EvaluationJoined> {
+async function mockSaveEvaluation(evaluationId: string, draft: EvaluationDraft): Promise<EvaluationJoined> {
   await latency(350)
   const evalItem = evaluations.find(e => e.id === evaluationId)
   if (!evalItem) throw new Error(`Evaluation ${evaluationId} not found`)
@@ -211,7 +216,7 @@ export async function saveEvaluation(evaluationId: string, draft: EvaluationDraf
   return { ...evalItem, scores: { ...evalItem.scores }, student: joinedStudent(evalItem.studentId) }
 }
 
-export async function submitEvaluation(evaluationId: string, draft: EvaluationDraft): Promise<EvaluationJoined> {
+async function mockSubmitEvaluation(evaluationId: string, draft: EvaluationDraft): Promise<EvaluationJoined> {
   await latency(450)
   const evalItem = evaluations.find(e => e.id === evaluationId)
   if (!evalItem) throw new Error(`Evaluation ${evaluationId} not found`)
@@ -221,12 +226,12 @@ export async function submitEvaluation(evaluationId: string, draft: EvaluationDr
   return { ...evalItem, scores: { ...evalItem.scores }, student: joinedStudent(evalItem.studentId) }
 }
 
-export async function fetchCertificates(): Promise<CertificateJoined[]> {
+async function mockFetchCertificates(): Promise<CertificateJoined[]> {
   await latency(300)
   return certificates.map(c => ({ ...c, student: joinedStudent(c.studentId) }))
 }
 
-export async function setCertificateStatus(certificateId: string, status: CertificateStatus): Promise<CertificateJoined> {
+async function mockSetCertificateStatus(certificateId: string, status: CertificateStatus): Promise<CertificateJoined> {
   await latency(300)
   const cert = certificates.find(c => c.id === certificateId)
   if (!cert) throw new Error(`Certificate ${certificateId} not found`)
@@ -235,7 +240,7 @@ export async function setCertificateStatus(certificateId: string, status: Certif
   return { ...cert, student: joinedStudent(cert.studentId) }
 }
 
-export async function fetchLetters(): Promise<LetterJoined[]> {
+async function mockFetchLetters(): Promise<LetterJoined[]> {
   await latency(300)
   const rank: Record<LorStatus, number> = { draft: 0, pending_review: 1, signed: 2, delivered: 3 }
   return letters
@@ -243,13 +248,7 @@ export async function fetchLetters(): Promise<LetterJoined[]> {
     .sort((a, b) => rank[a.status] - rank[b.status] || b.updatedAt.localeCompare(a.updatedAt))
 }
 
-export interface LetterDraft {
-  summary: string
-  strengths: string
-  body: string
-}
-
-export async function saveLetter(letterId: string, draft: LetterDraft): Promise<LetterJoined> {
+async function mockSaveLetter(letterId: string, draft: LetterDraft): Promise<LetterJoined> {
   await latency(350)
   const letter = letters.find(l => l.id === letterId)
   if (!letter) throw new Error(`Letter ${letterId} not found`)
@@ -257,7 +256,7 @@ export async function saveLetter(letterId: string, draft: LetterDraft): Promise<
   return { ...letter, student: joinedStudent(letter.studentId) }
 }
 
-export async function setLetterStatus(letterId: string, status: LorStatus): Promise<LetterJoined> {
+async function mockSetLetterStatus(letterId: string, status: LorStatus): Promise<LetterJoined> {
   await latency(300)
   const letter = letters.find(l => l.id === letterId)
   if (!letter) throw new Error(`Letter ${letterId} not found`)
@@ -266,17 +265,12 @@ export async function setLetterStatus(letterId: string, status: LorStatus): Prom
   return { ...letter, student: joinedStudent(letter.studentId) }
 }
 
-export async function fetchDoctorConversations(): Promise<DoctorConversation[]> {
+async function mockFetchDoctorConversations(): Promise<DoctorConversation[]> {
   await latency(300)
   return conversations.map(c => ({ ...c, messages: c.messages.map(m => ({ ...m })) }))
 }
 
-export async function fetchDoctorMessageTemplates(): Promise<{ id: string; label: string; text: string }[]> {
-  await latency(150)
-  return doctorMessageTemplates.map(t => ({ ...t }))
-}
-
-export async function sendDoctorMessage(
+async function mockSendDoctorMessage(
   conversationId: string,
   text: string,
   attachment?: { name: string; size: string },
@@ -291,7 +285,7 @@ export async function sendDoctorMessage(
   return { ...conversation, messages: conversation.messages.map(m => ({ ...m })) }
 }
 
-export async function sendDoctorMessageToStudent(
+async function mockSendDoctorMessageToStudent(
   studentId: string,
   text: string,
 ): Promise<DoctorConversation> {
@@ -321,7 +315,7 @@ export async function sendDoctorMessageToStudent(
   return { ...conversation }
 }
 
-export async function markDoctorConversationRead(conversationId: string): Promise<DoctorConversation> {
+async function mockMarkDoctorConversationRead(conversationId: string): Promise<DoctorConversation> {
   await latency(150)
   const conversation = conversations.find(c => c.id === conversationId)
   if (!conversation) throw new Error(`Conversation ${conversationId} not found`)
@@ -329,13 +323,217 @@ export async function markDoctorConversationRead(conversationId: string): Promis
   return { ...conversation }
 }
 
-export async function fetchDoctorNotifications(): Promise<DoctorNotification[]> {
+async function mockFetchDoctorNotifications(): Promise<DoctorNotification[]> {
   await latency(200)
   return notifications.map(n => ({ ...n }))
 }
 
-export async function markAllDoctorNotificationsRead(): Promise<DoctorNotification[]> {
+async function mockMarkAllDoctorNotificationsRead(): Promise<DoctorNotification[]> {
   await latency(200)
   notifications = notifications.map(n => ({ ...n, read: true }))
   return notifications.map(n => ({ ...n }))
+}
+
+// ---------------------------------------------------------------------------
+// Real path (live backend data)
+// ---------------------------------------------------------------------------
+
+interface BackendNotification {
+  id: string
+  tone: 'info' | 'success' | 'warning' | 'critical'
+  title: string
+  body: string
+  read: boolean
+  time?: string
+  createdAt?: string | null
+}
+
+const toneToType: Record<BackendNotification['tone'], DoctorNotification['type']> = {
+  info: 'system',
+  success: 'certificate',
+  warning: 'logbook',
+  critical: 'evaluation',
+}
+
+function mapBackendNotification(n: BackendNotification): DoctorNotification {
+  return {
+    id: n.id,
+    type: toneToType[n.tone] ?? 'system',
+    title: n.title,
+    message: n.body,
+    time: n.time ?? '',
+    read: n.read,
+    createdAt: n.createdAt ?? null,
+  }
+}
+
+async function realFetchDoctorStudentDetail(studentId: string): Promise<DoctorStudentDetail> {
+  const student = await apiGet<DoctorStudent>(`/doctor/students/${studentId}`)
+  return {
+    ...student,
+    attendance: [],
+    attendancePercentage: 0,
+    progress: buildProgress(student.progressCount),
+  }
+}
+
+async function realFetchDoctorNotifications(): Promise<DoctorNotification[]> {
+  const raw = await apiGet<BackendNotification[]>('/notifications')
+  return raw.map(mapBackendNotification)
+}
+
+// ---------------------------------------------------------------------------
+// Exported service
+// ---------------------------------------------------------------------------
+
+export async function fetchDoctorStudents(): Promise<DoctorStudent[]> {
+  if (!isDemoUser()) return apiGet<DoctorStudent[]>('/doctor/students')
+  return mockFetchDoctorStudents()
+}
+
+export async function fetchDoctorStudentDetail(studentId: string): Promise<DoctorStudentDetail> {
+  if (!isDemoUser()) return realFetchDoctorStudentDetail(studentId)
+  return mockFetchDoctorStudentDetail(studentId)
+}
+
+export async function fetchDoctorProfile(): Promise<DoctorProfile> {
+  if (!isDemoUser()) return apiGet<DoctorProfile>('/doctor/profile')
+  return mockFetchDoctorProfile()
+}
+
+export async function fetchTodaySchedule(): Promise<ScheduleItem[]> {
+  if (!isDemoUser()) return apiGet<ScheduleItem[]>('/doctor/schedule')
+  return mockFetchTodaySchedule()
+}
+
+export async function fetchUpcomingRotationStarts(): Promise<UpcomingRotationStart[]> {
+  if (!isDemoUser()) return apiGet<UpcomingRotationStart[]>('/doctor/upcoming-rotations')
+  return mockFetchUpcomingRotationStarts()
+}
+
+export async function fetchLogbookEntries(): Promise<LogbookEntryJoined[]> {
+  if (!isDemoUser()) return apiGet<LogbookEntryJoined[]>('/doctor/logbook')
+  return mockFetchLogbookEntries()
+}
+
+export async function setLogbookStatus(entryId: string, status: LogbookStatus, comments?: string): Promise<LogbookEntryJoined> {
+  if (!isDemoUser()) {
+    return apiPatch<LogbookEntryJoined>(`/doctor/logbook/${entryId}`, { status, comments })
+  }
+  return mockSetLogbookStatus(entryId, status, comments)
+}
+
+export async function fetchEvaluations(): Promise<EvaluationJoined[]> {
+  if (!isDemoUser()) return apiGet<EvaluationJoined[]>('/doctor/evaluations')
+  return mockFetchEvaluations()
+}
+
+export interface EvaluationDraft {
+  scores: EvaluationScores
+  overallPerformance: number
+  strengths: string
+  areasForImprovement: string
+  overallComments: string
+  finalRecommendation: FinalRecommendation
+}
+
+export async function saveEvaluation(evaluationId: string, draft: EvaluationDraft): Promise<EvaluationJoined> {
+  if (!isDemoUser()) {
+    return apiPatch<EvaluationJoined>(`/doctor/evaluations/${evaluationId}`, { ...draft, submit: false })
+  }
+  return mockSaveEvaluation(evaluationId, draft)
+}
+
+export async function submitEvaluation(evaluationId: string, draft: EvaluationDraft): Promise<EvaluationJoined> {
+  if (!isDemoUser()) {
+    return apiPatch<EvaluationJoined>(`/doctor/evaluations/${evaluationId}`, { ...draft, submit: true })
+  }
+  return mockSubmitEvaluation(evaluationId, draft)
+}
+
+export async function fetchCertificates(): Promise<CertificateJoined[]> {
+  if (!isDemoUser()) return apiGet<CertificateJoined[]>('/doctor/certificates')
+  return mockFetchCertificates()
+}
+
+export async function setCertificateStatus(certificateId: string, status: CertificateStatus): Promise<CertificateJoined> {
+  if (!isDemoUser()) {
+    return apiPatch<CertificateJoined>(`/doctor/certificates/${certificateId}`, { status })
+  }
+  return mockSetCertificateStatus(certificateId, status)
+}
+
+export async function fetchLetters(): Promise<LetterJoined[]> {
+  if (!isDemoUser()) return apiGet<LetterJoined[]>('/doctor/letters')
+  return mockFetchLetters()
+}
+
+export interface LetterDraft {
+  summary: string
+  strengths: string
+  body: string
+}
+
+export async function saveLetter(letterId: string, draft: LetterDraft): Promise<LetterJoined> {
+  if (!isDemoUser()) {
+    return apiPatch<LetterJoined>(`/doctor/letters/${letterId}`, draft)
+  }
+  return mockSaveLetter(letterId, draft)
+}
+
+export async function setLetterStatus(letterId: string, status: LorStatus): Promise<LetterJoined> {
+  if (!isDemoUser()) {
+    return apiPatch<LetterJoined>(`/doctor/letters/${letterId}`, { status })
+  }
+  return mockSetLetterStatus(letterId, status)
+}
+
+export async function fetchDoctorConversations(): Promise<DoctorConversation[]> {
+  if (!isDemoUser()) return apiGet<DoctorConversation[]>('/doctor/conversations')
+  return mockFetchDoctorConversations()
+}
+
+export async function fetchDoctorMessageTemplates(): Promise<{ id: string; label: string; text: string }[]> {
+  return doctorMessageTemplates.map(t => ({ ...t }))
+}
+
+export async function sendDoctorMessage(
+  conversationId: string,
+  text: string,
+  attachment?: { name: string; size: string },
+): Promise<DoctorConversation> {
+  if (!isDemoUser()) {
+    return apiPost<DoctorConversation>('/doctor/conversations', { conversationId, text, attachment })
+  }
+  return mockSendDoctorMessage(conversationId, text, attachment)
+}
+
+export async function sendDoctorMessageToStudent(
+  studentId: string,
+  text: string,
+): Promise<DoctorConversation> {
+  if (!isDemoUser()) {
+    return apiPost<DoctorConversation>('/doctor/conversations', { studentId, text })
+  }
+  return mockSendDoctorMessageToStudent(studentId, text)
+}
+
+export async function markDoctorConversationRead(conversationId: string): Promise<DoctorConversation> {
+  if (!isDemoUser()) {
+    return apiPatch<DoctorConversation>(`/doctor/conversations/${conversationId}/read`)
+  }
+  return mockMarkDoctorConversationRead(conversationId)
+}
+
+export async function fetchDoctorNotifications(): Promise<DoctorNotification[]> {
+  if (!isDemoUser()) return realFetchDoctorNotifications()
+  return mockFetchDoctorNotifications()
+}
+
+export async function markAllDoctorNotificationsRead(): Promise<DoctorNotification[]> {
+  if (!isDemoUser()) {
+    await apiPost<void>('/notifications/read-all')
+    return realFetchDoctorNotifications()
+  }
+  return mockMarkAllDoctorNotificationsRead()
 }

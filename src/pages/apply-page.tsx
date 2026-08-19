@@ -78,8 +78,8 @@ export function ApplyPage() {
   const program = elective
 
   const beginIfEmpty = () => {
-    if (!startDate) setStartDate(program.startDates[0])
-    if (!duration) setDuration(program.durationWeeks[0])
+    if (!startDate && program.startDates.length > 0) setStartDate(program.startDates[0])
+    if (!duration && program.durationWeeks.length > 0) setDuration(program.durationWeeks[0])
   }
 
   const missingRequired = program.requirements.filter(r => !availableDocs.some(d => d.name === r))
@@ -176,7 +176,8 @@ export function ApplyPage() {
             <div className="rounded-2xl border border-ink-200 bg-ink-50/50 p-5 text-sm">
               <p className="font-semibold text-ink-800">{elective.eligibility}</p>
               <p className="mt-2 text-xs leading-relaxed text-ink-600">
-                Duration options: {elective.durationWeeks.join(' / ')} weeks · Fee: $
+                Duration options:{' '}
+                {elective.durationWeeks.length ? elective.durationWeeks.join(' / ') : 'Flexible'} weeks · Fee: $
                 {elective.fee.toLocaleString()} · Application deadline:{' '}
                 {formatDate(elective.applicationDeadline)}
               </p>
@@ -205,43 +206,70 @@ export function ApplyPage() {
             <h2 className="font-display text-lg font-bold text-ink-900">Choose your rotation</h2>
             <div>
               <label className="mb-1.5 block text-sm font-semibold text-ink-900">Start date</label>
-              <select
-                value={startDate}
-                onChange={e => setStartDate(e.target.value)}
-                className={cn(
-                  'w-full cursor-pointer rounded-xl border px-4 py-3 text-sm outline-none transition-colors focus:border-brand-500 focus:bg-white',
-                  startDate ? 'border-ink-200 bg-ink-50/50' : 'border-ink-200 bg-ink-50/50 text-ink-400',
-                )}
-              >
-                <option value="" disabled>
-                  Select date
-                </option>
-                {elective.startDates.map(d => (
-                  <option key={d} value={d}>
-                    {formatDate(d)}
+              {elective.startDates.length > 0 ? (
+                <select
+                  value={startDate}
+                  onChange={e => setStartDate(e.target.value)}
+                  className={cn(
+                    'w-full cursor-pointer rounded-xl border px-4 py-3 text-sm outline-none transition-colors focus:border-brand-500 focus:bg-white',
+                    startDate ? 'border-ink-200 bg-ink-50/50' : 'border-ink-200 bg-ink-50/50 text-ink-400',
+                  )}
+                >
+                  <option value="" disabled>
+                    Select date
                   </option>
-                ))}
-              </select>
+                  {elective.startDates.map(d => (
+                    <option key={d} value={d}>
+                      {formatDate(d)}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={e => setStartDate(e.target.value)}
+                  className="w-full cursor-pointer rounded-xl border border-ink-200 bg-ink-50/50 px-4 py-3 text-sm text-ink-800 outline-none transition-colors focus:border-brand-500 focus:bg-white"
+                />
+              )}
+              {elective.startDates.length === 0 && (
+                <p className="mt-1.5 text-xs text-ink-500">
+                  No published start dates yet — pick your preferred start date and the hospital
+                  will confirm availability.
+                </p>
+              )}
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-semibold text-ink-900">Duration</label>
-              <div className="flex flex-wrap gap-2">
-                {elective.durationWeeks.map(w => (
-                  <button
-                    key={w}
-                    type="button"
-                    onClick={() => setDuration(w)}
-                    className={cn(
-                      'rounded-full border px-5 py-2.5 text-sm font-semibold transition-colors',
-                      duration === w
-                        ? 'border-brand-600 bg-brand-600 text-white'
-                        : 'border-ink-300 bg-white text-ink-700 hover:border-brand-400',
-                    )}
-                  >
-                    {w} weeks
-                  </button>
-                ))}
-              </div>
+              {elective.durationWeeks.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {elective.durationWeeks.map(w => (
+                    <button
+                      key={w}
+                      type="button"
+                      onClick={() => setDuration(w)}
+                      className={cn(
+                        'rounded-full border px-5 py-2.5 text-sm font-semibold transition-colors',
+                        duration === w
+                          ? 'border-brand-600 bg-brand-600 text-white'
+                          : 'border-ink-300 bg-white text-ink-700 hover:border-brand-400',
+                      )}
+                    >
+                      {w} weeks
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <input
+                  type="number"
+                  min={1}
+                  max={52}
+                  value={duration ?? ''}
+                  onChange={e => setDuration(e.target.value ? Number(e.target.value) : null)}
+                  placeholder="Weeks (e.g. 4)"
+                  className="w-full rounded-xl border border-ink-200 bg-ink-50/50 px-4 py-3 text-sm text-ink-800 outline-none transition-colors focus:border-brand-500 focus:bg-white"
+                />
+              )}
             </div>
             {duration !== null && (
               <p className="rounded-xl bg-brand-50 px-4 py-3 text-sm text-brand-800">

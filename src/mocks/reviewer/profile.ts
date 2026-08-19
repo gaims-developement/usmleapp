@@ -9,7 +9,6 @@ export interface ReviewerProfile {
   approvalRate: number
   onTimeRate: number
   documentsVerified: number
-  since: string
   specialties: string[]
 }
 
@@ -24,6 +23,5 @@ export const reviewerProfile: ReviewerProfile = {
   approvalRate: 74,
   onTimeRate: 96,
   documentsVerified: 8420,
-  since: '2026-01',
   specialties: ['Internal Medicine', 'Pediatrics', 'Cardiology', 'Obstetrics & Gynecology'],
 }

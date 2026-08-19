@@ -1,16 +1,15 @@
-import { apiGet, apiPatch } from '@/lib/apiClient'
-import type { ReviewerApplication, ReviewerRecommendation } from '@/mocks/reviewer/applications'
+import { apiGet, apiPatch, apiPost } from '@/lib/apiClient'
+import type { DocVerification, ReviewerApplication, ReviewerRecommendation } from '@/mocks/reviewer/applications'
 import {
   messageTemplates,
   reviewerConversations,
   type MessageTemplate,
   type ReviewerConversation,
 } from '@/mocks/reviewer/messages'
-import { reviewerNotifications, type ReviewerNotification } from '@/mocks/reviewer/notifications'
+import type { ReviewerNotification } from '@/mocks/reviewer/notifications'
 import { reviewerProfile, type ReviewerProfile } from '@/mocks/reviewer/profile'
 
 let conversations = [...reviewerConversations]
-let notifications = [...reviewerNotifications]
 
 export interface ReviewDraft {
   reviewerNotes?: string
@@ -44,12 +43,12 @@ export async function fetchMessageTemplates(): Promise<MessageTemplate[]> {
 }
 
 export async function fetchReviewerNotifications(): Promise<ReviewerNotification[]> {
-  return notifications
+  return apiGet<ReviewerNotification[]>('/notifications')
 }
 
 export async function markAllReviewerNotificationsRead(): Promise<ReviewerNotification[]> {
-  notifications = notifications.map(n => ({ ...n, read: true }))
-  return notifications
+  await apiPost<void>('/notifications/read-all')
+  return fetchReviewerNotifications()
 }
 
 export async function startReview(applicationId: string): Promise<ReviewerApplication> {
@@ -111,21 +110,23 @@ export async function forwardToHospital(applicationId: string, draft: ReviewDraf
 
 export async function setDocumentVerification(
   applicationId: string,
-  docName: string,
-  verification: string,
+  documentId: string,
+  verification: DocVerification,
+  note?: string,
 ): Promise<ReviewerApplication> {
-  const res = await apiPatch<ReviewerApplication>(`/applications/${applicationId}/documents/${docName}`, {
+  const res = await apiPatch<ReviewerApplication>(`/applications/${applicationId}/documents/${documentId}`, {
     verification,
+    ...(note !== undefined ? { note } : {}),
   })
   return res
 }
 
 export async function setDocumentNote(
   applicationId: string,
-  docName: string,
+  documentId: string,
   note: string,
 ): Promise<ReviewerApplication> {
-  const res = await apiPatch<ReviewerApplication>(`/applications/${applicationId}/documents/${docName}`, {
+  const res = await apiPatch<ReviewerApplication>(`/applications/${applicationId}/documents/${documentId}`, {
     note,
   })
   return res

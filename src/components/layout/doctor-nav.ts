@@ -5,12 +5,17 @@ import {
   ClipboardList,
   FileSignature,
   LayoutDashboard,
+  MessageSquare,
   MessageSquareText,
   RotateCw,
   Stethoscope,
   UserCircle,
   Users,
 } from 'lucide-react'
+
+export const doctorPendingNav: AppNavItem[] = [
+  { to: '/dashboard/doctor', label: 'Dashboard', icon: LayoutDashboard, section: 'Overview', end: true },
+]
 
 export const doctorNav: AppNavItem[] = [
   { to: '/dashboard/doctor', label: 'Dashboard', icon: LayoutDashboard, section: 'Overview', end: true },
@@ -22,5 +27,6 @@ export const doctorNav: AppNavItem[] = [
   { to: '/dashboard/doctor/letters', label: 'Letters of Recommendation', icon: FileSignature, section: 'Assessments' },
   { to: '/dashboard/doctor/certificates', label: 'Certificates', icon: Award, section: 'Assessments' },
   { to: '/dashboard/doctor/messages', label: 'Messages', icon: MessageSquareText, section: 'Communication' },
+  { to: '/forum', label: 'Forum', icon: MessageSquare, section: 'Communication' },
   { to: '/dashboard/doctor/profile', label: 'Profile', icon: UserCircle, section: 'Account', end: true },
 ]

@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { z } from 'zod'
+import { prisma } from '../../db/prisma.js'
 import { asyncHandler } from '../../utils/async-handler.js'
 import { validate } from '../../middleware/validate.middleware.js'
 import { authenticate } from '../../middleware/auth.middleware.js'
@@ -43,6 +44,8 @@ const updateProfileSchema = z.object({
         city: z.string().trim().optional(),
         state: z.string().trim().optional(),
         country: z.string().trim().optional(),
+        address: z.string().trim().optional(),
+        website: z.string().trim().optional(),
         email: z.string().trim().email().optional(),
         phone: z.string().trim().optional(),
         description: z.string().trim().optional(),
@@ -55,6 +58,8 @@ const updateProfileSchema = z.object({
     doctor: z
       .object({
         specialty: z.string().trim().optional(),
+        title: z.string().trim().optional(),
+        licenseNumber: z.string().trim().optional(),
         email: z.string().trim().email().optional(),
         phone: z.string().trim().optional(),
         availability: z.string().trim().optional(),
@@ -65,6 +70,10 @@ const updateProfileSchema = z.object({
         specialty: z.string().trim().optional(),
         department: z.string().trim().optional(),
         timezone: z.string().trim().optional(),
+        title: z.string().trim().optional(),
+        institution: z.string().trim().optional(),
+        phone: z.string().trim().optional(),
+        yearsOfExperience: z.coerce.number().int().min(0).max(60).optional(),
       })
       .optional(),
   }),
@@ -162,9 +171,9 @@ userRouter.get(
       id: u.id,
       name: u.name,
       email: u.email,
-      college: u.studentProfile?.college ?? 'Medical University',
-      graduationYear: u.studentProfile?.graduationYear ?? 2027,
-      visaStatus: u.studentProfile?.visaStatus ?? 'F1',
+      college: u.studentProfile?.college ?? null,
+      graduationYear: u.studentProfile?.graduationYear ?? null,
+      visaStatus: u.studentProfile?.visaStatus ?? null,
       onboarded: u.onboarded,
       isDemo: u.isDemo,
     }))
@@ -189,8 +198,8 @@ userRouter.get(
       id: u.id,
       name: u.name,
       email: u.email,
-      specialty: u.reviewerProfile?.specialty ?? 'General',
-      department: u.reviewerProfile?.department ?? 'Education',
+      specialty: u.reviewerProfile?.specialty ?? null,
+      department: u.reviewerProfile?.department ?? null,
       onboarded: u.onboarded,
       isDemo: u.isDemo,
     }))
@@ -208,19 +217,96 @@ userRouter.get(
         role: { name: 'HOSPITAL' },
       },
       include: {
-        hospitalProfile: true,
+        hospitalProfile: {
+          include: {
+            hospitalCodes: true,
+            programs: true,
+            doctors: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+
+    const mapped = hospitals.map(u => {
+      const activeCode = u.hospitalProfile?.hospitalCodes?.find(c => c.isActive)?.code ?? 'N/A'
+      return {
+        id: u.hospitalProfile?.id || u.id,
+        userId: u.id,
+        name: u.hospitalProfile?.name ?? u.name,
+        organizationName: u.hospitalProfile?.name ?? u.name,
+        city: u.hospitalProfile?.city ?? '',
+        state: u.hospitalProfile?.state ?? '',
+        country: u.hospitalProfile?.country ?? '',
+        email: u.email,
+        phone: u.hospitalProfile?.phone ?? '',
+        hospitalCode: activeCode,
+        tier: u.hospitalProfile?.tier ?? 'standard',
+        programs: u.hospitalProfile?.programs?.length ?? 0,
+        doctors: u.hospitalProfile?.doctors?.length ?? 0,
+        students: 0,
+        rating: 4.8,
+        status: u.hospitalProfile?.status ?? 'active',
+        joinedAt: u.createdAt.toISOString().slice(0, 10),
+        onboarded: u.onboarded,
+        isDemo: u.isDemo,
+      }
+    })
+    return res.json({ success: true, data: mapped })
+  }),
+)
+
+userRouter.get(
+  '/doctors',
+  requireRoles('SUPER_ADMIN', 'ADMIN'),
+  asyncHandler(async (req, res) => {
+    const doctors = await prisma.user.findMany({
+      where: {
+        isDemo: req.user.isDemo,
+        role: { name: 'DOCTOR' },
+      },
+      include: {
+        doctorProfile: true,
       },
     })
-    const mapped = hospitals.map(u => ({
+    const mapped = doctors.map(u => ({
       id: u.id,
       name: u.name,
       email: u.email,
-      organizationName: u.hospitalProfile?.name ?? u.name,
-      city: u.hospitalProfile?.city ?? 'Boston',
-      state: u.hospitalProfile?.state ?? 'MA',
-      country: u.hospitalProfile?.country ?? 'USA',
-      status: u.hospitalProfile?.status ?? 'active',
+      specialty: u.doctorProfile?.specialty ?? null,
+      hospital: u.doctorProfile?.hospitalName ?? null,
+      students: 0,
+      evaluations: 0,
+      rating: 4.8,
+      status: u.doctorProfile?.status ?? 'active',
+      joinedAt: u.createdAt.toISOString().slice(0, 10),
+      isDemo: u.isDemo,
+    }))
+    return res.json({ success: true, data: mapped })
+  }),
+)
+
+userRouter.get(
+  '/all',
+  requireRoles('SUPER_ADMIN', 'ADMIN'),
+  asyncHandler(async (req, res) => {
+    const users = await prisma.user.findMany({
+      where: {
+        isDemo: req.user.isDemo,
+      },
+      include: {
+        role: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+    const mapped = users.map(u => ({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      role: u.role?.name ?? 'USER',
+      status: u.status ?? 'active',
       onboarded: u.onboarded,
+      createdAt: u.createdAt.toISOString().slice(0, 10),
       isDemo: u.isDemo,
     }))
     return res.json({ success: true, data: mapped })

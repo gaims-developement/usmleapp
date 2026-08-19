@@ -52,6 +52,8 @@ function buildConfig(value) {
     const scriptDir = path.dirname(fileURLToPath(import.meta.url))
     const caCertPath = path.resolve(scriptDir, 'aiven-ca.pem')
     config.ssl = { ca: readFileSync(caCertPath, 'utf8'), rejectUnauthorized: true }
+  } else {
+    config.allowPublicKeyRetrieval = true
   }
   return config
 }

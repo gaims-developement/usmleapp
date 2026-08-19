@@ -52,6 +52,8 @@ async function updateProfile(userId, input) {
       'city',
       'state',
       'country',
+      'address',
+      'website',
       'email',
       'phone',
       'description',
@@ -67,14 +69,22 @@ async function updateProfile(userId, input) {
 
   const doctorData = {}
   if (input.doctor) {
-    for (const field of ['specialty', 'email', 'phone', 'availability']) {
+    for (const field of ['specialty', 'title', 'licenseNumber', 'email', 'phone', 'availability']) {
       if (input.doctor[field] !== undefined) doctorData[field] = input.doctor[field]
     }
   }
 
   const reviewerData = {}
   if (input.reviewer) {
-    for (const field of ['specialty', 'department', 'timezone']) {
+    for (const field of [
+      'specialty',
+      'department',
+      'timezone',
+      'title',
+      'institution',
+      'phone',
+      'yearsOfExperience',
+    ]) {
       if (input.reviewer[field] !== undefined) reviewerData[field] = input.reviewer[field]
     }
   }

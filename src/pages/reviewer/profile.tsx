@@ -11,6 +11,7 @@ import { StatusBadge, roleBadgeMeta } from '@/components/ui/status-badge'
 import { useToast } from '@/components/ui/toast'
 import { useAuth } from '@/hooks/useAuth'
 import { useReviewerApplications, useReviewerProfile } from '@/lib/reviewerQueries'
+import { formatMemberSince } from '@/lib/utils'
 import { roleById } from '@/roles/roles'
 
 function ProfileStat({ icon: Icon, label, value, tone }: { icon: typeof Clock3; label: string; value: string; tone: string }) {
@@ -74,7 +75,7 @@ export function ReviewerProfilePage() {
 
       <div className="mt-6 rounded-3xl border border-ink-200 bg-white p-6 shadow-soft">
         <div className="flex flex-wrap items-center gap-4">
-          <Avatar name={data.name} className="size-16 text-lg" />
+          <Avatar name={data.name} src={user.avatarUrl} className="size-16 text-lg" />
           <div className="min-w-0 flex-1">
             <p className="font-display text-xl font-bold text-ink-900">{data.name}</p>
             <p className="text-sm text-ink-500">{data.title}</p>
@@ -83,7 +84,7 @@ export function ReviewerProfilePage() {
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge label={roleBadgeMeta(user.role).label} tone={roleBadgeMeta(user.role).tone} />
             <span className="inline-flex items-center rounded-full bg-ink-100 px-2.5 py-1 text-xs font-semibold text-ink-600">
-              Member since {data.since}
+              Member since {formatMemberSince(user.createdAt)}
             </span>
           </div>
         </div>

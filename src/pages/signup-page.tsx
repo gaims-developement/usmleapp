@@ -104,9 +104,9 @@ export function SignupPage() {
   const openDoc = legalDoc === 'terms' ? termsSections : privacySections
 
   return (
-    <section className="flex min-h-screen items-center bg-gradient-to-b from-brand-50/60 to-white px-4 py-24">
-      <Container className="max-w-md">
-        <div className="mb-8 text-center">
+    <section className="flex min-h-screen items-center bg-gradient-to-b from-brand-50/60 to-white px-4 py-24 md:min-h-0 md:items-start md:py-10">
+      <Container className="max-w-md md:max-w-5xl">
+        <div className="mb-8 text-center md:mb-4">
           <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-brand-600 text-white shadow-glow">
             <Stethoscope className="size-6" aria-hidden />
           </span>
@@ -122,12 +122,12 @@ export function SignupPage() {
 
         <form
           onSubmit={handleSubmit}
-          className="rounded-3xl border border-ink-200 bg-white p-8 shadow-soft"
+          className="rounded-3xl border border-ink-200 bg-white p-8 shadow-soft md:p-8"
         >
           <StepIndicator step={step} />
 
           {step === 1 ? (
-            <>
+            <div className="grid gap-x-6 gap-y-4 md:grid-cols-2">
               <AuthField
                 label="Full name"
                 type="text"
@@ -136,6 +136,7 @@ export function SignupPage() {
                 icon={<UserRound className="size-4.5 text-ink-400" aria-hidden />}
                 value={form.name}
                 onChange={v => update('name', v)}
+                grid
               />
               <AuthField
                 label="Email address"
@@ -144,6 +145,7 @@ export function SignupPage() {
                 icon={<Mail className="size-4.5 text-ink-400" aria-hidden />}
                 value={form.email}
                 onChange={v => update('email', v)}
+                grid
               />
               <AuthField
                 label="Password"
@@ -153,9 +155,10 @@ export function SignupPage() {
                 minLength={8}
                 value={form.password}
                 onChange={v => update('password', v)}
+                className="md:col-span-2"
               />
 
-              <div className="mt-6 rounded-2xl border border-ink-200 bg-ink-50/50 p-5">
+              <div className="mt-2 rounded-2xl border border-ink-200 bg-ink-50/50 p-5 md:col-span-2">
                 <h3 className="text-sm font-semibold text-ink-900">Legal agreement</h3>
                 <p className="mt-1 text-xs leading-relaxed text-ink-600">
                   Read and accept both documents to continue. Each opens in a popup — please scroll
@@ -175,33 +178,36 @@ export function SignupPage() {
                 </div>
               </div>
 
-              <Button type="submit" size="lg" className="mt-6 w-full" disabled={!allAgreed}>
-                Continue
-              </Button>
-              {!allAgreed && (
-                <p className="mt-3 text-center text-xs text-ink-500">
-                  Please read and accept the Terms and Conditions and Privacy Policy above to
-                  continue.
-                </p>
-              )}
-            </>
+              <div className="md:col-span-2">
+                <Button type="submit" size="lg" className="w-full" disabled={!allAgreed}>
+                  Continue
+                </Button>
+                {!allAgreed && (
+                  <p className="mt-3 text-center text-xs text-ink-500">
+                    Please read and accept the Terms and Conditions and Privacy Policy above to
+                    continue.
+                  </p>
+                )}
+              </div>
+            </div>
           ) : (
-            <>
-              <div className="space-y-6">
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-ink-800">Date of birth</label>
-                  <DatePicker value={form.dob} onChange={v => update('dob', v)} />
-                </div>
+            <div className="grid gap-x-6 gap-y-4 md:grid-cols-2">
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-ink-800">Date of birth</label>
+                <DatePicker value={form.dob} onChange={v => update('dob', v)} />
+              </div>
 
-                <AuthField
-                  label="College name"
-                  type="text"
-                  placeholder="e.g. All India Institute of Medical Sciences"
-                  icon={<GraduationCap className="size-4.5 text-ink-400" aria-hidden />}
-                  value={form.college}
-                  onChange={v => update('college', v)}
-                />
+              <AuthField
+                label="College name"
+                type="text"
+                placeholder="e.g. All India Institute of Medical Sciences"
+                icon={<GraduationCap className="size-4.5 text-ink-400" aria-hidden />}
+                value={form.college}
+                onChange={v => update('college', v)}
+                grid
+              />
 
+              <div className="md:col-span-2">
                 <ChipSelect
                   label="Preferred electives"
                   hint="Select all that apply"
@@ -209,7 +215,9 @@ export function SignupPage() {
                   selected={form.electives}
                   onToggle={v => update('electives', toggleIn(form.electives, v))}
                 />
+              </div>
 
+              <div className="md:col-span-2">
                 <ChipSelect
                   label="Preferred locations in the USA"
                   hint="Select all that apply"
@@ -219,7 +227,7 @@ export function SignupPage() {
                 />
               </div>
 
-              <div className="mt-8 flex gap-3">
+              <div className="flex gap-3 md:col-span-2">
                 <Button
                   type="button"
                   variant="outline"
@@ -234,12 +242,12 @@ export function SignupPage() {
                 </Button>
               </div>
               {!stepTwoComplete && (
-                <p className="mt-3 text-center text-xs text-ink-500">
+                <p className="text-center text-xs text-ink-500 md:col-span-2">
                   Complete your date of birth, college, and at least one elective and location to
                   continue.
                 </p>
               )}
-            </>
+            </div>
           )}
 
           {submitError && (
@@ -286,7 +294,7 @@ export function SignupPage() {
 
 function StepIndicator({ step }: { step: number }) {
   return (
-    <div className="mb-8">
+    <div className="mb-8 md:mb-4">
       <div className="flex items-center gap-2">
         <span
           className={cn(
@@ -378,11 +386,13 @@ interface AuthFieldProps {
   value?: string
   onChange?: (value: string) => void
   minLength?: number
+  className?: string
+  grid?: boolean
 }
 
-export function AuthField({ label, type, placeholder, hint, icon, value, onChange, minLength }: AuthFieldProps) {
+export function AuthField({ label, type, placeholder, hint, icon, value, onChange, minLength, className, grid }: AuthFieldProps) {
   return (
-    <label className="mt-4 block">
+    <label className={cn('mt-4 block md:mt-0', grid && 'mt-0', className)}>
       <span className="mb-1.5 block text-sm font-medium text-ink-800">{label}</span>
       <span className="relative block">
         <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2">{icon}</span>

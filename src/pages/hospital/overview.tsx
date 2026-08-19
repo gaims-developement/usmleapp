@@ -4,6 +4,7 @@ import {
   ArrowRight,
   BadgeCheck,
   CalendarDays,
+  Clock,
   Copy,
   ClipboardList,
   GraduationCap,
@@ -19,12 +20,73 @@ import { PageLoader } from '@/components/ui/spinner'
 import { StatusBadge, hospitalAppStatusMeta } from '@/components/ui/status-badge'
 import { Avatar } from '@/components/ui/avatar'
 import { HospitalApplicationsTable } from '@/components/hospital/applications-table'
-import { useHospitalApplications, useHospitalPrograms } from '@/lib/hospitalQueries'
+import { useHospitalApplications, useHospitalOrganization, useHospitalPrograms } from '@/lib/hospitalQueries'
+import { useAuth } from '@/hooks/useAuth'
 import { formatDate } from '@/lib/utils'
 
 export function HospitalOverviewPage() {
+  const { user } = useAuth()
+  const hospitalStatus = user?.hospital?.status
+
+  if (hospitalStatus !== 'active') {
+    return <HospitalPendingView status={hospitalStatus} />
+  }
+
+  return <HospitalActiveView />
+}
+
+function HospitalPendingView({ status }: { status: string | null | undefined }) {
+  const { logout } = useAuth()
+  return (
+    <div>
+      <PageHeader
+        title="Hospital Dashboard"
+        subtitle="Your hospital account is pending approval."
+      />
+      <div className="mt-8 mx-auto max-w-lg">
+        <div className="rounded-3xl border border-amber-200 bg-white p-8 shadow-soft text-center">
+          <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-amber-100 text-amber-600">
+            <Clock className="size-7" aria-hidden />
+          </span>
+          <h2 className="mt-4 font-display text-xl font-bold text-ink-900">
+            Hospital Registration Under Review
+          </h2>
+          <p className="mt-2 text-sm text-ink-600 leading-relaxed">
+            Your hospital registration has been submitted and is currently being reviewed by the
+            IMG Prep administration. You will be notified once your registration has been approved.
+          </p>
+          <div className="mt-6 inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-800">
+            <span className="h-2 w-2 rounded-full bg-amber-500" />
+            Status: {status === 'pending' ? 'Review Pending' : status ?? 'Unknown'}
+          </div>
+          <p className="mt-4 text-xs text-ink-500">
+            Please check your notifications for updates.
+          </p>
+          <div className="mt-6 flex flex-col gap-3">
+            <Link
+              to="/announcements"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-glow transition-colors hover:bg-brand-700"
+            >
+              View announcements
+            </Link>
+            <button
+              type="button"
+              onClick={() => logout()}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-ink-200 px-4 py-2.5 text-sm font-semibold text-ink-700 transition-colors hover:bg-ink-50"
+            >
+              Log out
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function HospitalActiveView() {
   const applications = useHospitalApplications()
   const programs = useHospitalPrograms()
+  const organization = useHospitalOrganization()
   const navigate = useNavigate()
   const [copiedCode, setCopiedCode] = useState(false)
 
@@ -38,7 +100,8 @@ export function HospitalOverviewPage() {
     return { awaiting, accepted, scheduled, completed, openSeats }
   }, [applications.data, programs.data])
 
-  if (applications.isLoading || programs.isLoading) return <PageLoader label="Loading your hospital dashboard…" />
+  if (applications.isLoading || programs.isLoading || organization.isLoading)
+    return <PageLoader label="Loading your hospital dashboard…" />
 
   const all = applications.data ?? []
   const decisionQueue = stats.awaiting.slice(0, 5)
@@ -50,7 +113,8 @@ export function HospitalOverviewPage() {
   const programCapacity = (programs.data ?? [])
     .filter(p => p.status === 'published' || p.status === 'paused')
     .slice(0, 6)
-  const hospitalCode = 'IMGH-1001'
+  const hospitalCode = organization.data?.activeCode?.code ?? '—'
+  const hospitalName = organization.data?.profile.name ?? "St. Mary's University Hospital"
 
   async function copyHospitalCode() {
     try {
@@ -66,7 +130,7 @@ export function HospitalOverviewPage() {
     <div>
       <PageHeader
         title="Hospital Dashboard"
-        subtitle="St. Mary's University Hospital — electives operations at a glance."
+        subtitle={`${hospitalName} — electives operations at a glance.`}
         actions={
           <Link
             to="/dashboard/hospital/applications"

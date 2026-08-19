@@ -5,6 +5,7 @@ export interface DoctorNotification {
   message: string
   time: string
   read: boolean
+  createdAt?: string | null
 }
 
 export const doctorNotifications: DoctorNotification[] = [

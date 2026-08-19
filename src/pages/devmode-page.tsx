@@ -9,9 +9,8 @@ import { Container } from '@/components/ui/container'
 import { PageLoader } from '@/components/ui/spinner'
 import { AuthField } from '@/pages/signup-page'
 import { NotFoundPage } from '@/pages/not-found-page'
-import { ROLE_IDS, roleById, roleDashboardPath } from '@/roles/roles'
-import { DEMO_LOGIN_BY_ROLE } from '@/mock/users'
-import { AuthError } from '@/services/authService'
+import { roleById, roleDashboardPath } from '@/roles/roles'
+import { DEMO_LOGIN_BY_ROLE, DEMO_ROLE_IDS } from '@/mock/users'
 import type { RoleId } from '@/types/rbac'
 import { cn } from '@/lib/utils'
 
@@ -38,7 +37,7 @@ function DevModeForm() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  function selectRole(role: RoleId) {
+  function selectRole(role: Exclude<RoleId, 'SUPER_ADMIN'>) {
     setSelectedRole(role)
     setEmail(DEMO_LOGIN_BY_ROLE[role].email)
     setPassword(DEMO_LOGIN_BY_ROLE[role].password)
@@ -53,7 +52,7 @@ function DevModeForm() {
       const result = await login({ email, password })
       navigate(roleDashboardPath(result.user.role), { replace: true })
     } catch (err) {
-      setError(err instanceof AuthError ? err.message : 'Something went wrong. Please try again.')
+      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
       setSubmitting(false)
     }
   }
@@ -87,7 +86,7 @@ function DevModeForm() {
           className="rounded-3xl border border-ink-200 bg-white p-8 shadow-soft"
         >
           <div className="grid grid-cols-3 gap-2">
-            {ROLE_IDS.map(role => {
+            {DEMO_ROLE_IDS.map(role => {
               const meta = roleById(role)
               const active = selectedRole === role
               return (

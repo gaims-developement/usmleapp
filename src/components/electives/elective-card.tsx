@@ -1,10 +1,13 @@
 import { Link } from 'react-router-dom'
 import { ArrowRight, Clock, DollarSign, MapPin, Star } from 'lucide-react'
-import type { Elective } from '@/mocks/electives'
+import type { Elective } from '@/lib/types'
 import { StatusBadge } from '@/components/ui/status-badge'
 
-export function formatDate(iso: string) {
-  return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', {
+export function formatDate(iso?: string | null) {
+  if (!iso) return '—'
+  const date = new Date(iso + 'T00:00:00')
+  if (Number.isNaN(date.getTime())) return '—'
+  return date.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -13,6 +16,8 @@ export function formatDate(iso: string) {
 
 export function ElectiveCard({ elective }: { elective: Elective }) {
   const earliest = elective.startDates[0]
+  const hasRating = typeof elective.rating === 'number'
+  const durationLabel = elective.durationWeeks.length ? `${elective.durationWeeks.join(' / ')} weeks` : '—'
   return (
     <Link
       to={`/electives/${elective.id}`}
@@ -25,10 +30,12 @@ export function ElectiveCard({ elective }: { elective: Elective }) {
           </h3>
           <p className="mt-0.5 truncate text-sm text-ink-600">{elective.hospital}</p>
         </div>
-        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">
-          <Star className="size-3.5 fill-amber-400 text-amber-400" aria-hidden />
-          {elective.rating.toFixed(1)}
-        </span>
+        {hasRating && (
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">
+            <Star className="size-3.5 fill-amber-400 text-amber-400" aria-hidden />
+            {elective.rating!.toFixed(1)}
+          </span>
+        )}
       </div>
 
       <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm text-ink-600">
@@ -38,7 +45,7 @@ export function ElectiveCard({ elective }: { elective: Elective }) {
         </span>
         <span className="inline-flex items-center gap-1.5">
           <Clock className="size-4 text-ink-400" aria-hidden />
-          {elective.durationWeeks.join(' / ')} weeks
+          {durationLabel}
         </span>
         <span className="inline-flex items-center gap-1.5 font-medium text-ink-800">
           <DollarSign className="size-4 text-ink-400" aria-hidden />

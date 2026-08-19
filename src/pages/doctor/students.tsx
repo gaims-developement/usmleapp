@@ -79,7 +79,7 @@ export function DoctorStudentsPage() {
       cell: row => (
         <div className="text-ink-600">
           <p>{formatDate(row.rotationStart)} → {formatDate(row.rotationEnd)}</p>
-          <p className="text-xs text-ink-400">{row.rotationStart >= '2026-11-02' ? 'Starting soon' : 'In progress'}</p>
+          <p className="text-xs text-ink-400">{row.rotationStart && row.rotationStart > new Date().toISOString().slice(0, 10) ? 'Starting soon' : 'In progress'}</p>
         </div>
       ),
     },

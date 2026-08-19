@@ -29,6 +29,24 @@ export class ApiError extends Error {
   }
 }
 
+export function documentPreviewErrorMessage(err: unknown): string {
+  const fallback = err instanceof Error ? err.message : 'Preview unavailable.'
+  const code = err instanceof ApiError ? err.code : undefined
+  switch (code) {
+    case 'DOCUMENT_RECORD_NOT_FOUND':
+      return 'Document record not found.'
+    case 'DOCUMENT_ACCESS_DENIED':
+      return 'You are not authorized to view this document.'
+    case 'CLOUDINARY_ASSET_NOT_FOUND':
+    case 'FILE_NOT_FOUND':
+      return 'The uploaded file is missing from storage.'
+    case 'DOCUMENT_PREVIEW_FAILED':
+      return 'Document preview failed.'
+    default:
+      return fallback
+  }
+}
+
 interface ApiEnvelope<T> {
   success: boolean
   data: T
@@ -50,6 +68,10 @@ const PUBLIC_PATHS = new Set([
   '/auth/login',
   '/auth/register',
   '/auth/register/partner',
+  '/auth/register/hospital',
+  '/auth/register/doctor',
+  '/auth/register/reviewer',
+  '/auth/hospital-code/lookup',
   '/auth/refresh',
   '/auth/logout',
   '/auth/verify-email/request',
@@ -60,7 +82,7 @@ const PUBLIC_PATHS = new Set([
 ])
 
 function isPublicPath(path: string): boolean {
-  return PUBLIC_PATHS.has(path)
+  return PUBLIC_PATHS.has(path.split('?')[0])
 }
 
 function readToken(): string | null {
@@ -204,3 +226,39 @@ export function apiPut<T>(path: string, body?: unknown, options?: RequestOptions
 export function apiDelete<T>(path: string, options?: RequestOptions): Promise<T> {
   return apiRequest<T>(path, { ...options, method: 'DELETE' })
 }
+
+export async function apiFormPost<T>(path: string, formData: FormData): Promise<T> {
+  const token = sessionService.get()?.accessToken
+  const url = `${BASE_URL}${path}`
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: formData,
+  })
+  if (!res.ok) {
+    throw await parseError(res)
+  }
+  const envelope = (await res.json()) as ApiEnvelope<T>
+  return envelope.data
+}
+
+export async function apiGetBlob(path: string): Promise<{ blob: Blob; contentType: string | null }> {
+  const token = sessionService.get()?.accessToken
+  const url = `${BASE_URL}${path}`
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  })
+  if (!res.ok) {
+    throw await parseError(res)
+  }
+  const contentType = res.headers.get('content-type')
+  const blob = await res.blob()
+  return { blob, contentType }
+}
+
+export { BASE_URL }

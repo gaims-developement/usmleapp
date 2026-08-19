@@ -32,11 +32,11 @@ export function UploadDropzone({ onFile }: { onFile: (file: File) => void }) {
       <span className="mt-1 text-sm font-semibold text-ink-900">
         Drag &amp; drop a file here, or <span className="text-brand-700">browse</span>
       </span>
-      <span className="text-xs text-ink-500">PDF, DOCX, or images up to 10 MB</span>
+      <span className="text-xs text-ink-500">PDFs up to 5 MB, images (JPG/PNG/WEBP) up to 1 MB</span>
       <input
         ref={inputRef}
         type="file"
-        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+        accept=".pdf,.jpg,.jpeg,.png,.webp"
         className="hidden"
         onChange={e => {
           const file = e.target.files?.[0]

@@ -43,6 +43,8 @@ export function applicationStatusMeta(status: string): { label: string; tone: Ba
       return { label: 'Under review', tone: 'amber' }
     case 'additional_info':
       return { label: 'Info needed', tone: 'red' }
+    case 'approved':
+      return { label: 'Approved', tone: 'emerald' }
     case 'offered':
       return { label: 'Offer received', tone: 'violet' }
     case 'confirmed':
@@ -51,6 +53,12 @@ export function applicationStatusMeta(status: string): { label: string; tone: Ba
       return { label: 'Withdrawn', tone: 'neutral' }
     case 'rejected':
       return { label: 'Not selected', tone: 'red' }
+    case 'forwarded':
+      return { label: 'Forwarded', tone: 'sky' }
+    case 'waitlisted':
+      return { label: 'Waitlisted', tone: 'amber' }
+    case 'completed':
+      return { label: 'Completed', tone: 'emerald' }
     default:
       return { label: status, tone: 'neutral' }
   }
@@ -156,10 +164,16 @@ export function paymentStatusMeta(status: string): { label: string; tone: BadgeT
   switch (status) {
     case 'paid':
       return { label: 'Paid', tone: 'brand' }
+    case 'under_verification':
+      return { label: 'Verifying', tone: 'amber' }
+    case 'awaiting_payment':
+    case 'payment_submitted':
     case 'pending':
       return { label: 'Pending', tone: 'amber' }
     case 'refunded':
       return { label: 'Refunded', tone: 'neutral' }
+    case 'rejected':
+      return { label: 'Rejected', tone: 'red' }
     default:
       return { label: 'Failed', tone: 'red' }
   }
@@ -206,17 +220,6 @@ export function supportPriorityMeta(priority: string): { label: string; tone: Ba
       return { label: 'Medium', tone: 'sky' }
     default:
       return { label: 'Low', tone: 'neutral' }
-  }
-}
-
-export function applicationPriorityMeta(priority: string): { label: string; tone: BadgeTone } {
-  switch (priority) {
-    case 'high':
-      return { label: 'High', tone: 'red' }
-    case 'low':
-      return { label: 'Low', tone: 'neutral' }
-    default:
-      return { label: 'Normal', tone: 'sky' }
   }
 }
 

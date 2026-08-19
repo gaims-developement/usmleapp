@@ -6,6 +6,7 @@ import {
   ClipboardList,
   FileText,
   FolderOpen,
+  Megaphone,
   Sparkles,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
@@ -14,6 +15,7 @@ import {
   useRecommendedElectives,
   useLatestApplications,
 } from '@/lib/dashboardQueries'
+import { useAnnouncements } from '@/lib/studentQueries'
 import { PageLoader } from '@/components/ui/spinner'
 import { ElectiveCard } from '@/components/electives/elective-card'
 import { applicationStatusMeta, StatusBadge } from '@/components/ui/status-badge'
@@ -26,6 +28,7 @@ export function DashboardPage() {
   const stats = useDashboardStats()
   const electives = useRecommendedElectives()
   const applications = useLatestApplications()
+  const announcementsQuery = useAnnouncements()
 
   const loading = stats.isPending || electives.isPending || applications.isPending
 
@@ -34,6 +37,7 @@ export function DashboardPage() {
   const firstInitial = user?.name?.[0] ?? 'I'
   const recommended = electives.data ?? []
   const latestApps = applications.data ?? []
+  const latestAnnouncements = (announcementsQuery.data ?? []).slice(0, 3)
 
   return (
     <div className="space-y-8">
@@ -66,6 +70,28 @@ export function DashboardPage() {
         />
         <StatCard icon={Sparkles} label="Applications submitted" value={stats.data?.totalApplications ?? 0} tone="violet" />
       </div>
+
+      {latestAnnouncements.length > 0 && (
+        <div className="rounded-3xl border border-amber-200/80 bg-amber-50/40 p-6 shadow-soft">
+          <SectionHeading
+            title="Announcements"
+            subtitle="Latest updates from IMG Prep"
+            action={{ to: '/announcements', label: 'View all' }}
+          />
+          <div className="mt-4 space-y-3">
+            {latestAnnouncements.map(a => (
+              <div key={a.id} className="rounded-xl border border-amber-200/60 bg-white px-4 py-3">
+                <h4 className="text-sm font-bold text-ink-900">{a.title}</h4>
+                <p className="mt-0.5 line-clamp-2 text-xs text-ink-600">{a.body}</p>
+                <p className="mt-1 text-[11px] font-medium text-ink-400">
+                  {a.date ? new Date(a.date + (a.date.includes('T') ? '' : 'T00:00:00')).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
+                  {a.author ? ` · ${a.author}` : ''}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-8 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
@@ -116,7 +142,7 @@ export function DashboardPage() {
                 return (
                   <li key={app.id}>
                     <Link
-                      to="/applications"
+                      to={`/applications/${app.id}`}
                       className="flex items-center justify-between gap-3 rounded-xl border border-ink-100 px-4 py-3 transition-colors hover:border-brand-300 hover:bg-brand-50/40"
                     >
                       <span className="min-w-0">

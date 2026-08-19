@@ -10,6 +10,7 @@ import { StatusBadge, doctorAvailabilityMeta, doctorStatusMeta } from '@/compone
 import { Avatar } from '@/components/ui/avatar'
 import { Modal } from '@/components/ui/modal'
 import { useToast } from '@/components/ui/toast'
+import { formatDate } from '@/lib/utils'
 import { useCreateHospitalDoctor, useHospitalDoctors } from '@/lib/hospitalQueries'
 import { hospitalDepartments } from '@/mocks/hospital/programs'
 import type { HospitalDoctorInput } from '@/services/hospitalService'
@@ -135,7 +136,7 @@ export function HospitalDoctorsPage() {
                 <Users className="size-4" aria-hidden />
                 {d.studentsAssigned} students assigned
               </span>
-              <span className="text-xs text-ink-400">Joined {d.joinedAt}</span>
+              <span className="text-xs text-ink-400">Joined {formatDate(d.joinedAt)}</span>
             </div>
           </article>
         ))}

@@ -1,32 +1,78 @@
 import { Router } from 'express'
 import { prisma } from '../db/prisma.js'
 import { asyncHandler } from '../utils/async-handler.js'
+import { authenticateOptional } from '../middleware/auth.middleware.js'
+import { DATE_ONLY } from '../utils/status-maps.js'
 
 export const programRouter = Router()
+
+// Parse a free-text duration like "4, 8, 12 weeks" into week numbers.
+function durationWeeksFrom(duration) {
+  if (!duration) return []
+  const matches = String(duration).match(/\d+/g)
+  return matches ? matches.map(Number) : []
+}
+
+function mapProgram(program) {
+  const durationWeeks = durationWeeksFrom(program.duration)
+  const slots = program.slots ?? []
+  return {
+    id: program.id,
+    specialty: program.specialty ?? 'General',
+    hospital: program.hospital.name ?? 'Hospital',
+    city: program.hospital.city ?? '',
+    state: program.hospital.state ?? '',
+    status: program.status,
+    spots: program.seats,
+    filled: program.filledSeats,
+    fee: program.fee != null ? Number(program.fee) : 0,
+    description: program.description ?? '',
+    requirements: (program.requirements ?? []).map(r => r.requirement),
+    eligibility: program.eligibility ?? '',
+    // Presentation fields not yet tracked in the DB. Returned as empty/null so the
+    // frontend renders honestly (no fabricated ratings/highlights) and never crashes.
+    rating: null,
+    teachingType: null,
+    highlights: [],
+    startDates: slots.length
+      ? slots.map(s => DATE_ONLY(s.startDate)).filter(Boolean)
+      : program.startDate
+        ? [DATE_ONLY(program.startDate)]
+        : [],
+    durationWeeks: durationWeeks.length ? durationWeeks : slots.length ? [] : [],
+    applicationDeadline: program.deadline ? DATE_ONLY(program.deadline) : '',
+  }
+}
 
 // GET /api/programs - Retrieve list of active programs (electives)
 programRouter.get(
   '/',
+  authenticateOptional,
   asyncHandler(async (req, res) => {
     const { search, specialty, city, duration } = req.query
 
-    let whereClause = { status: 'ACTIVE' }
+    // Demo isolation: a user only ever browses programs from their own
+    // environment. Demo users (isDemo = true) see demo programs; real users
+    // and anonymous visitors only see real (isDemo = false) programs.
+    const isDemo = req.user?.isDemo ?? false
+
+    const whereClause = { status: 'ACTIVE' }
+    const hospitalWhere = { user: { isDemo } }
 
     if (specialty) {
       whereClause.specialty = specialty
     }
 
     if (city) {
-      // Find programs where hospital's city and state match
-      const [cityName, stateName] = city.split(',').map(s => s.trim())
-      whereClause.hospital = {
-        city: cityName,
-        state: stateName,
-      }
+      const [cityName, stateName] = String(city).split(',').map(s => s.trim())
+      hospitalWhere.city = cityName || undefined
+      hospitalWhere.state = stateName || undefined
     }
 
+    whereClause.hospital = hospitalWhere
+
     if (search) {
-      const q = search.toLowerCase()
+      const q = String(search).toLowerCase()
       whereClause.OR = [
         { specialty: { contains: q } },
         { title: { contains: q } },
@@ -35,68 +81,47 @@ programRouter.get(
       ]
     }
 
-    const programs = await prisma.program.findMany({
+    let programs = await prisma.program.findMany({
       where: whereClause,
-      include: { hospital: true },
+      include: {
+        hospital: true,
+        requirements: true,
+        slots: { orderBy: { startDate: 'asc' } },
+      },
     })
 
-    const mapped = programs.map(p => ({
-      id: p.id,
-      specialty: p.specialty ?? 'General',
-      hospital: p.hospital.name ?? 'Hospital',
-      city: p.hospital.city ?? 'Boston',
-      state: p.hospital.state ?? 'MA',
-      rating: Number(p.fee) > 1200 ? 4.8 : 4.5, // Mocked rating
-      spots: p.seats,
-      teachingType: 'Inpatient', // Default
-      fee: Number(p.fee),
-      description: p.description ?? '',
-      highlights: ['U.S. clinical exposure', 'Letter of Recommendation potential'],
-      requirements: ['Passport', 'CV / Resume', 'Medical school transcript', 'Immunization record', 'TB screening'],
-      eligibility: p.eligibility ?? 'All medical students & grads',
-      startDates: [p.startDate?.toISOString().slice(0, 10) ?? '2027-01-01'],
-      durationWeeks: [4, 8],
-      applicationDeadline: p.deadline?.toISOString().slice(0, 10) ?? '2026-12-31',
-    }))
+    if (duration) {
+      const weeks = Number(duration)
+      if (Number.isFinite(weeks)) {
+        programs = programs.filter(p => durationWeeksFrom(p.duration).includes(weeks))
+      }
+    }
 
-    return res.json({ success: true, data: mapped })
+    return res.json({ success: true, data: programs.map(mapProgram) })
   }),
 )
 
 // GET /api/programs/:id - Retrieve program details
 programRouter.get(
   '/:id',
+  authenticateOptional,
   asyncHandler(async (req, res) => {
     const { id } = req.params
+    const isDemo = req.user?.isDemo ?? false
 
     const program = await prisma.program.findUnique({
-      where: { id },
-      include: { hospital: true },
+      where: { id, hospital: { user: { isDemo } } },
+      include: {
+        hospital: true,
+        requirements: true,
+        slots: { orderBy: { startDate: 'asc' } },
+      },
     })
 
     if (!program) {
       return res.status(404).json({ success: false, error: { message: 'Program not found' } })
     }
 
-    const mapped = {
-      id: program.id,
-      specialty: program.specialty ?? 'General',
-      hospital: program.hospital.name ?? 'Hospital',
-      city: program.hospital.city ?? 'Boston',
-      state: program.hospital.state ?? 'MA',
-      rating: 4.8,
-      spots: program.seats,
-      teachingType: 'Inpatient',
-      fee: Number(program.fee),
-      description: program.description ?? '',
-      highlights: ['U.S. clinical exposure', 'Letter of Recommendation potential'],
-      requirements: ['Passport', 'CV / Resume', 'Medical school transcript', 'Immunization record', 'TB screening'],
-      eligibility: program.eligibility ?? 'All medical students & grads',
-      startDates: [program.startDate?.toISOString().slice(0, 10) ?? '2027-01-01'],
-      durationWeeks: [4, 8],
-      applicationDeadline: program.deadline?.toISOString().slice(0, 10) ?? '2026-12-31',
-    }
-
-    return res.json({ success: true, data: mapped })
+    return res.json({ success: true, data: mapProgram(program) })
   }),
 )

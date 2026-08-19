@@ -45,7 +45,7 @@ async function getRecommendedElectives(): Promise<Elective[]> {
     if (b.score !== a.score) {
       return b.score - a.score
     }
-    return b.elective.rating - a.elective.rating
+    return (b.elective.rating ?? 0) - (a.elective.rating ?? 0)
   })
 
   return scoredElectives.map(item => item.elective)

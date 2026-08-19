@@ -7,6 +7,7 @@ export interface ReviewerNotification {
   body: string
   time: string
   read: boolean
+  createdAt?: string | null
 }
 
 export const reviewerNotifications: ReviewerNotification[] = [

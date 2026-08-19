@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { PageLoader } from '@/components/ui/spinner'
-import { StatusBadge, applicationPriorityMeta, applicationStatusMeta } from '@/components/ui/status-badge'
+import { StatusBadge, applicationStatusMeta } from '@/components/ui/status-badge'
 import {
   ApplicationActions,
   ApplicationDetailModal,
@@ -20,7 +20,6 @@ export function AdminApplicationsPage() {
   const applications = useAdminApplications()
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('all')
-  const [priority, setPriority] = useState('all')
   const [flagFilter, setFlagFilter] = useState('all')
   const [selected, setSelected] = useState<AdminApplication | null>(null)
 
@@ -37,11 +36,10 @@ export function AdminApplicationsPage() {
       )
     }
     if (status !== 'all') result = result.filter(a => a.status === status)
-    if (priority !== 'all') result = result.filter(a => a.priority === priority)
     if (flagFilter === 'flagged') result = result.filter(a => a.flagged)
     if (flagFilter === 'unflagged') result = result.filter(a => !a.flagged)
     return result
-  }, [applications.data, search, status, priority, flagFilter])
+  }, [applications.data, search, status, flagFilter])
 
   if (applications.isLoading) return <PageLoader label="Loading application queue…" />
 
@@ -64,20 +62,6 @@ export function AdminApplicationsPage() {
     { key: 'student', header: 'Student', cell: r => r.student, sortValue: r => r.student },
     { key: 'hospital', header: 'Hospital', cell: r => <span className="block max-w-52 truncate">{r.hospital}</span> },
     { key: 'specialty', header: 'Specialty', cell: r => r.specialty, sortValue: r => r.specialty },
-    {
-      key: 'priority',
-      header: 'Priority',
-      cell: r => {
-        const meta = applicationPriorityMeta(r.priority)
-        return (
-          <div className="flex items-center gap-1.5">
-            {r.flagged && <Flag className="size-3.5 text-red-500" aria-label="Flagged" />}
-            <StatusBadge label={meta.label} tone={meta.tone} />
-          </div>
-        )
-      },
-      sortValue: r => r.priority,
-    },
     {
       key: 'status',
       header: 'Status',
@@ -112,7 +96,6 @@ export function AdminApplicationsPage() {
         hospital: a.hospital,
         specialty: a.specialty,
         status: a.status,
-        priority: a.priority,
         reviewer: a.reviewer,
         amount: formatCurrency(a.amount),
         submittedAt: a.submittedAt,
@@ -191,12 +174,6 @@ export function AdminApplicationsPage() {
           <option value="confirmed">Confirmed</option>
           <option value="withdrawn">Withdrawn</option>
           <option value="rejected">Not selected</option>
-        </Select>
-        <Select value={priority} onChange={e => setPriority(e.target.value)} className="w-36" aria-label="Filter by priority">
-          <option value="all">All priorities</option>
-          <option value="high">High</option>
-          <option value="normal">Normal</option>
-          <option value="low">Low</option>
         </Select>
         <Select value={flagFilter} onChange={e => setFlagFilter(e.target.value)} className="w-36" aria-label="Filter by flag">
           <option value="all">All flags</option>

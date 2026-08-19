@@ -9,7 +9,9 @@ import {
   CheckCircle2,
   Download,
   Eye,
+  FileText,
   FileWarning,
+  FileX,
   GraduationCap,
   MessageSquare,
   Save,
@@ -25,11 +27,10 @@ import { Select } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Modal } from '@/components/ui/modal'
-import { PageLoader } from '@/components/ui/spinner'
+import { PageLoader, Spinner } from '@/components/ui/spinner'
 import { Avatar } from '@/components/ui/avatar'
 import {
   StatusBadge,
-  applicationPriorityMeta,
   reviewDocMeta,
   reviewerAppStatusMeta,
   reviewerRecommendationMeta,
@@ -48,7 +49,8 @@ import {
   useStartReview,
 } from '@/lib/reviewerQueries'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { ELIGIBILITY_ITEMS, type DocVerification, type EligibilityCheck, type ReviewDocType, type ReviewerApplication, type ReviewerRecommendation } from '@/mocks/reviewer/applications'
+import { apiGetBlob, documentPreviewErrorMessage } from '@/lib/apiClient'
+import { ELIGIBILITY_ITEMS, type DocVerification, type EligibilityCheck, type ReviewDocType, type ReviewDocument, type ReviewerApplication, type ReviewerRecommendation } from '@/mocks/reviewer/applications'
 
 function InfoRow({ label, value }: { label: string; value: string | number }) {
   return (
@@ -103,6 +105,12 @@ export function ReviewerApplicationDetailPage() {
   const [rejectText, setRejectText] = useState('')
   const [changesOpen, setChangesOpen] = useState(false)
   const [changesText, setChangesText] = useState('')
+  const [approved, setApproved] = useState(false)
+
+  const [viewingDoc, setViewingDoc] = useState<ReviewDocument | null>(null)
+  const [fileUrl, setFileUrl] = useState<string | null>(null)
+  const [fileLoading, setFileLoading] = useState(false)
+  const [fileError, setFileError] = useState<string | null>(null)
 
   useEffect(() => {
     if (app.data) {
@@ -113,6 +121,52 @@ export function ReviewerApplicationDetailPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [app.data?.id])
+
+  useEffect(() => {
+    if (!viewingDoc) {
+      setFileUrl(null)
+      setFileError(null)
+      setFileLoading(false)
+      return
+    }
+
+    if (!viewingDoc.id) {
+      setFileUrl(null)
+      setFileLoading(false)
+      setFileError('No file is linked to this document entry.')
+      return
+    }
+
+    let isMounted = true
+    let blobUrl: string | null = null
+
+    async function fetchFileBlob() {
+      setFileLoading(true)
+      setFileError(null)
+
+      try {
+        const { blob, contentType } = await apiGetBlob(`/documents/${viewingDoc!.id}/file`)
+        if (isMounted) {
+          const finalBlob = contentType ? new Blob([blob], { type: contentType }) : blob
+          blobUrl = URL.createObjectURL(finalBlob)
+          setFileUrl(blobUrl)
+        }
+      } catch (err) {
+        if (isMounted) {
+          setFileError(documentPreviewErrorMessage(err))
+        }
+      } finally {
+        if (isMounted) setFileLoading(false)
+      }
+    }
+
+    void fetchFileBlob()
+
+    return () => {
+      isMounted = false
+      if (blobUrl) URL.revokeObjectURL(blobUrl)
+    }
+  }, [viewingDoc])
 
   if (app.isLoading) return <PageLoader label="Loading application…" />
   if (!id || app.isError || !app.data) {
@@ -131,6 +185,7 @@ export function ReviewerApplicationDetailPage() {
 
   const a: ReviewerApplication = app.data
   const decisionPending = approve.isPending || reject.isPending || requestChanges.isPending || forward.isPending
+  const isApproved = a.status === 'approved'
   const draft = {
     reviewerNotes,
     internalNotes,
@@ -139,22 +194,76 @@ export function ReviewerApplicationDetailPage() {
   }
 
   const stMeta = reviewerAppStatusMeta(a.status)
-  const prMeta = applicationPriorityMeta(a.priority)
 
   function afterDecide(label: string) {
     toast.success(label, `${a.id} · ${a.student.name}`)
     navigate('/dashboard/reviewer')
   }
 
-  function handleDocStatus(docName: ReviewDocType, verification: DocVerification) {
+  function handleDocStatus(doc: ReviewDocument, verification: DocVerification) {
+    if (!doc.applicationDocumentId) {
+      toast.error('Could not update document', 'This document cannot be updated.')
+      return
+    }
     setDocVerification.mutate(
-      { applicationId: a.id, docName, verification },
       {
-        onSuccess: () => toast.success('Document updated', `${docName} marked as ${verification.replace(/_/g, ' ')}.`),
+        applicationId: a.id,
+        documentId: doc.applicationDocumentId,
+        verification,
+        ...(verification === 'rejected' && doc.note ? { note: doc.note } : {}),
+      },
+      {
+        onSuccess: () =>
+          toast.success('Document updated', `${doc.name} marked as ${verification.replace(/_/g, ' ')}.`),
         onError: () => toast.error('Could not update document'),
       },
     )
   }
+
+  const handleDownloadDoc = async (doc: ReviewDocument) => {
+    if (!doc.id) {
+      toast.error('Download Unavailable', 'No physical file is available for this entry.')
+      return
+    }
+    try {
+      const { blob, contentType } = await apiGetBlob(`/documents/${doc.id}/file`)
+      const finalBlob = contentType ? new Blob([blob], { type: contentType }) : blob
+      const url = URL.createObjectURL(finalBlob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = doc.fileName ?? `${doc.name}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      toast.success('Downloading', `Started download for ${doc.fileName ?? doc.name}`)
+    } catch (err) {
+      toast.error('Download Unavailable', err instanceof Error ? err.message : 'No physical file is available for this entry.')
+    }
+  }
+
+  const handleDownloadViewingFile = () => {
+    if (!viewingDoc) return
+    if (fileUrl) {
+      const a = document.createElement('a')
+      a.href = fileUrl
+      a.download = viewingDoc.fileName ?? `${viewingDoc.name}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      toast.success('Downloading', `Started download for ${viewingDoc.fileName ?? viewingDoc.name}`)
+    } else {
+      toast.error('Download Unavailable', 'No physical file is available to download for this entry.')
+    }
+  }
+
+  const isPdf = viewingDoc
+    ? viewingDoc.mimeType === 'application/pdf' || (viewingDoc.fileName ?? '').toLowerCase().endsWith('.pdf')
+    : false
+
+  const isImage = viewingDoc
+    ? viewingDoc.mimeType?.startsWith('image/') || /\.(jpg|jpeg|png|webp)$/i.test(viewingDoc.fileName ?? '')
+    : false
 
   const verifiedCount = a.documents.filter(d => d.verification === 'verified').length
 
@@ -178,7 +287,6 @@ export function ReviewerApplicationDetailPage() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <StatusBadge label={prMeta.label} tone={prMeta.tone} />
           <StatusBadge label={stMeta.label} tone={stMeta.tone} />
           <button
             type="button"
@@ -272,7 +380,7 @@ export function ReviewerApplicationDetailPage() {
                     <div className="mt-3 flex items-center gap-1.5">
                       <button
                         type="button"
-                        onClick={() => toast.info('Preview', `Opening ${doc.name}…`)}
+                        onClick={() => setViewingDoc(doc)}
                         className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-ink-200 px-2.5 py-1 text-xs font-semibold text-ink-700 transition-colors hover:bg-ink-50"
                       >
                         <Eye className="size-3.5" aria-hidden />
@@ -280,7 +388,7 @@ export function ReviewerApplicationDetailPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => toast.success('Download started', `${doc.name}.pdf`)}
+                        onClick={() => void handleDownloadDoc(doc)}
                         className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-ink-200 px-2.5 py-1 text-xs font-semibold text-ink-700 transition-colors hover:bg-ink-50"
                       >
                         <Download className="size-3.5" aria-hidden />
@@ -298,7 +406,7 @@ export function ReviewerApplicationDetailPage() {
                         <button
                           key={v}
                           type="button"
-                          onClick={() => handleDocStatus(doc.name, v)}
+                          onClick={() => handleDocStatus(doc, v)}
                           className={`inline-flex cursor-pointer items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors ${cls}`}
                         >
                           <IconComp className="size-3.5" aria-hidden />
@@ -343,7 +451,7 @@ export function ReviewerApplicationDetailPage() {
                             disabled={setDocNote.isPending}
                             onClick={() =>
                               setDocNote.mutate(
-                                { applicationId: a.id, docName: doc.name, note: noteValue },
+                                { applicationId: a.id, documentId: doc.applicationDocumentId!, note: noteValue },
                                 {
                                   onSuccess: () => {
                                     toast.success('Note saved', `${doc.name} updated.`)
@@ -482,19 +590,31 @@ export function ReviewerApplicationDetailPage() {
                 size="sm"
                 className="w-full"
                 disabled={decisionPending}
-                onClick={() => approve.mutate({ applicationId: a.id, draft }, { onSuccess: () => afterDecide('Application approved') })}
+                onClick={() =>
+                  approve.mutate(
+                    { applicationId: a.id, draft },
+                    {
+                      onSuccess: () => {
+                        toast.success('Application approved', `${a.id} · ${a.student.name}`)
+                        setApproved(true)
+                      },
+                      onError: () => toast.error('Could not approve application'),
+                    },
+                  )
+                }
               >
                 <CheckCircle2 className="size-4" aria-hidden />
                 Approve Application
               </Button>
               <Button
                 size="sm"
-                className="w-full !bg-emerald-600 hover:!bg-emerald-700"
-                disabled={decisionPending}
+                className="w-full !bg-emerald-600 hover:!bg-emerald-700 disabled:!bg-ink-100 disabled:!text-ink-400 disabled:hover:!bg-ink-100"
+                disabled={decisionPending || !isApproved}
+                title={!isApproved ? 'Approve the application first to unlock sending it to the hospital.' : undefined}
                 onClick={() => forward.mutate({ applicationId: a.id, draft }, { onSuccess: () => afterDecide('Application forwarded') })}
               >
                 <Send className="size-4" aria-hidden />
-                Forward to Hospital
+                {isApproved ? 'Send to Hospital' : 'Approve to unlock'}
               </Button>
               <Button
                 variant="outline"
@@ -676,6 +796,116 @@ export function ReviewerApplicationDetailPage() {
             placeholder="Explain the reason and next steps…"
           />
         </div>
+      </Modal>
+
+      <Modal
+        open={approved}
+        onClose={() => setApproved(false)}
+        title="Application approved"
+        description={`${a.id} · ${a.student.name}`}
+        size="sm"
+        footer={
+          <>
+            <Button variant="outline" size="sm" onClick={() => navigate('/dashboard/reviewer')}>
+              Back to dashboard
+            </Button>
+            <Button size="sm" onClick={() => setApproved(false)}>
+              Done
+            </Button>
+          </>
+        }
+      >
+        <div className="flex flex-col items-center gap-4 py-6 text-center">
+          <span className="grid size-16 place-items-center rounded-full bg-emerald-100 text-emerald-600">
+            <CheckCircle2 className="size-9" aria-hidden />
+          </span>
+          <p className="text-sm text-ink-600">
+            This application has been approved. A green tick now shows next to it in the applications section, and you
+            can now <span className="font-semibold text-ink-900">send it to the hospital</span>.
+          </p>
+        </div>
+      </Modal>
+
+      <Modal
+        open={!!viewingDoc}
+        onClose={() => setViewingDoc(null)}
+        title={viewingDoc ? viewingDoc.name : 'Document Preview'}
+        description={viewingDoc ? `Uploaded ${formatDate(viewingDoc.uploadedAt)}` : undefined}
+        size="lg"
+        footer={
+          viewingDoc && (
+            <div className="flex w-full items-center justify-between gap-3">
+              <Button variant="outline" size="sm" onClick={handleDownloadViewingFile}>
+                <Download className="size-4" aria-hidden />
+                Download
+              </Button>
+              <Button size="sm" onClick={() => setViewingDoc(null)}>
+                Close
+              </Button>
+            </div>
+          )
+        }
+      >
+        {viewingDoc && (
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-ink-50 px-4 py-2.5 text-sm">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-ink-700">Status:</span>
+                <StatusBadge label={reviewDocMeta(viewingDoc.verification).label} tone={reviewDocMeta(viewingDoc.verification).tone} />
+              </div>
+              {viewingDoc.fileName && <span className="font-mono text-xs text-ink-500">{viewingDoc.fileName}</span>}
+            </div>
+
+            <div className="flex min-h-[400px] flex-col items-center justify-center overflow-hidden rounded-2xl border border-ink-200 bg-ink-900/5 p-2">
+              {fileLoading ? (
+                <div className="flex flex-col items-center justify-center gap-3 py-16 text-ink-500">
+                  <Spinner className="size-7 text-brand-600" />
+                  <p className="text-sm font-medium">Loading document stream…</p>
+                </div>
+              ) : fileError ? (
+                <div className="flex flex-col items-center justify-center gap-3 px-6 py-12 text-center">
+                  <div className="grid size-14 place-items-center rounded-2xl bg-amber-100 text-amber-700">
+                    <FileX className="size-7" aria-hidden />
+                  </div>
+                  <div>
+                    <h5 className="text-base font-bold text-ink-900">Preview Unavailable</h5>
+                    <p className="mt-1 max-w-md text-xs text-ink-500">{fileError}</p>
+                    <div className="mt-4 space-y-1 rounded-xl border border-ink-200 bg-white p-3 text-left font-mono text-xs text-ink-600">
+                      <p><span className="font-bold text-ink-800">Document:</span> {viewingDoc.name}</p>
+                      <p><span className="font-bold text-ink-800">Uploaded:</span> {formatDate(viewingDoc.uploadedAt)}</p>
+                      {viewingDoc.note && <p><span className="font-bold text-ink-800">Note:</span> {viewingDoc.note}</p>}
+                    </div>
+                  </div>
+                </div>
+              ) : fileUrl ? (
+                isPdf ? (
+                  <iframe
+                    src={fileUrl}
+                    className="h-[520px] w-full rounded-xl border border-ink-200 bg-white"
+                    title={viewingDoc.name}
+                  />
+                ) : isImage ? (
+                  <img
+                    src={fileUrl}
+                    alt={viewingDoc.name}
+                    className="mx-auto max-h-[520px] w-auto rounded-xl object-contain shadow-soft"
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+                    <FileText className="size-12 text-ink-400" aria-hidden />
+                    <p className="text-sm font-medium text-ink-700">File format cannot be previewed in browser.</p>
+                    <Button variant="outline" size="sm" onClick={handleDownloadViewingFile}>
+                      <Download className="size-4" aria-hidden />
+                      Download to View
+                    </Button>
+                  </div>
+                )
+              ) : (
+                <div className="py-12 text-sm text-ink-400">No document preview available.</div>
+              )}
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   )

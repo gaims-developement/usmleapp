@@ -96,7 +96,18 @@ export function SuperAdminOverviewPage() {
     },
   ]
 
-  const analyticsData = analytics.data!
+  const analyticsData = analytics.data ?? {
+    monthlyRegistrations: [],
+    applicationsByStatus: [],
+    applicationsBySpecialty: [],
+  }
+
+  const defaultKpiIcons: Record<string, typeof ClipboardList> = {
+    'total-apps': ClipboardList,
+    pending: ClipboardList,
+    revenue: BarChart3,
+    students: GraduationCap,
+  }
 
   return (
     <div>
@@ -118,23 +129,34 @@ export function SuperAdminOverviewPage() {
       />
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {kpis.data!.map(kpi => (
-          <KpiCard key={kpi.id} label={kpi.label} value={kpi.value} icon={kpi.icon} delta={kpi.delta} deltaTone={kpi.deltaTone} hint={kpi.hint} />
-        ))}
+        {(kpis.data ?? []).map(kpi => {
+          const Icon = kpi.icon || defaultKpiIcons[kpi.id] || ClipboardList
+          return (
+            <KpiCard
+              key={kpi.id}
+              label={kpi.label}
+              value={kpi.value}
+              icon={Icon}
+              delta={kpi.delta}
+              deltaTone={kpi.deltaTone}
+              hint={kpi.hint}
+            />
+          )
+        })}
       </div>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-3">
         <Widget title="Registration trend" subtitle="New students per month" className="lg:col-span-2">
-          <LineChart data={analyticsData.monthlyRegistrations} />
+          <LineChart data={analyticsData.monthlyRegistrations ?? []} />
         </Widget>
         <Widget title="Applications by status" subtitle="All active applications">
-          <DonutChart data={analyticsData.applicationsByStatus} />
+          <DonutChart data={analyticsData.applicationsByStatus ?? []} />
         </Widget>
       </div>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-3">
         <Widget title="Applications by specialty" subtitle="Volume across disciplines">
-          <HBarChart data={analyticsData.applicationsBySpecialty} />
+          <HBarChart data={analyticsData.applicationsBySpecialty ?? []} />
         </Widget>
         <Widget title="Quick actions" className="lg:col-span-2">
           <QuickActions actions={quickActions} />
@@ -147,7 +169,7 @@ export function SuperAdminOverviewPage() {
         </Widget>
         <Widget title="Platform health" subtitle="Service uptime · trailing 90 days">
           <ul className="space-y-4">
-            {uptime.data!.map(service => (
+            {(uptime.data ?? []).map(service => (
               <li key={service.name}>
                 <div className="mb-1.5 flex items-center justify-between text-sm">
                   <span className="text-ink-600">{service.name}</span>

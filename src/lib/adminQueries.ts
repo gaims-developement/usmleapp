@@ -22,6 +22,7 @@ import {
   fetchAuditLogs,
   fetchCmsPages,
   fetchDocument,
+  fetchStudentDocumentsGrouped,
   fetchNotifications,
   fetchOpsKpis,
   fetchPlatformSettings,
@@ -47,6 +48,8 @@ import {
   type NewHospitalInput,
   type NewProgramInput,
   type NewTicketInput,
+  sendAnnouncement,
+  type SendAnnouncementInput,
 } from '@/services/adminService'
 import type { AnnouncementStatus, SupportStatus } from '@/mocks/admin/content'
 import type { HospitalStatus } from '@/mocks/admin/people'
@@ -115,6 +118,12 @@ export const useAdminPrograms = () =>
 export const useAdminDocuments = () =>
   useQuery({ queryKey: adminQueryKeys.documents, queryFn: fetchAdminDocuments })
 
+export const useStudentGroupedDocuments = () =>
+  useQuery({
+    queryKey: [...adminQueryKeys.documents, 'students'],
+    queryFn: fetchStudentDocumentsGrouped,
+  })
+
 export const useAdminDocument = (id: string | null) =>
   useQuery({
     queryKey: adminQueryKeys.document(id ?? ''),
@@ -125,7 +134,7 @@ export const useAdminDocument = (id: string | null) =>
 export function useSetDocStatus() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, status }: { id: string; status: DocVerificationStatus }) => setDocStatus(id, status),
+    mutationFn: ({ id, status, note }: { id: string; status: DocVerificationStatus; note?: string }) => setDocStatus(id, status, note),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: adminQueryKeys.documents })
     },
@@ -261,6 +270,16 @@ export const useCreateAnnouncement = () => {
     mutationFn: (input: NewAnnouncementInput) => createAnnouncement(input),
     onSuccess: () => {
       invalidate(queryClient, [adminQueryKeys.announcements, adminQueryKeys.opsKpis])
+    },
+  })
+}
+
+export const useSendAnnouncement = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: SendAnnouncementInput) => sendAnnouncement(input),
+    onSuccess: () => {
+      invalidate(queryClient, [adminQueryKeys.announcements, adminQueryKeys.notifications, adminQueryKeys.opsKpis])
     },
   })
 }

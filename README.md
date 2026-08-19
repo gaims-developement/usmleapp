@@ -248,20 +248,25 @@ Registration page
 ## Demo accounts (mock logins)
 
 The seed script creates one demo account per role, all sharing the password
-below. These are real accounts in the database (auth is live), so you can log
-in with any of them once you've seeded the DB:
+below. These are real accounts in the database (auth is live) and are flagged
+`isDemo = true`, so they are fully isolated from real users. You can log in
+with any of them once you've seeded the DB:
 
 | Role | Email | Password |
 | --- | --- | --- |
-| Super Admin | `admin@imgprep.com` | `Admin@123` |
-| Admin | `ops@imgprep.com` | `Admin@123` |
-| Reviewer | `reviewer@imgprep.com` | `Admin@123` |
-| Hospital | `hospital@imgprep.com` | `Admin@123` |
-| Doctor / Mentor | `doctor@imgprep.com` | `Admin@123` |
-| Student | `student@imgprep.com` | `Admin@123` |
+| Admin | `admin@demo.com` | `DemoPass@2024!` |
+| Reviewer | `reviewer@demo.com` | `DemoPass@2024!` |
+| Hospital | `hospital@demo.com` | `DemoPass@2024!` |
+| Doctor / Mentor | `doctor@demo.com` | `DemoPass@2024!` |
+| Student | `student@demo.com` | `DemoPass@2024!` |
 
-(These same credentials are also mirrored in `src/mock/users.ts` for
-reference/UI use, e.g. quick-login buttons.)
+The Super Admin is a **real** account (`isDemo = false`) and is seeded
+separately from the demo environment. Its credentials come from the
+`SUPER_ADMIN_EMAIL` / `SUPER_ADMIN_PASSWORD` environment variables and are never
+placed in frontend code.
+
+(These demo credentials are also mirrored in `src/mock/users.ts` for the
+devmode login page, which is only enabled when `ENABLE_DEVMODE=true`.)
 
 ---
 

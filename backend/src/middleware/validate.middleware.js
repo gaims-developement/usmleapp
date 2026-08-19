@@ -14,8 +14,10 @@ export function validate(schema) {
       try {
         req.query = parsed.query
       } catch {
-        // Express request query/params are often read-only on the request object.
-        // Validation still succeeds; routes can continue using the original values.
+        for (const key of Object.keys(req.query)) {
+          delete req.query[key]
+        }
+        Object.assign(req.query, parsed.query)
       }
     }
 
@@ -23,8 +25,10 @@ export function validate(schema) {
       try {
         req.params = parsed.params
       } catch {
-        // Express request query/params are often read-only on the request object.
-        // Validation still succeeds; routes can continue using the original values.
+        for (const key of Object.keys(req.params)) {
+          delete req.params[key]
+        }
+        Object.assign(req.params, parsed.params)
       }
     }
 

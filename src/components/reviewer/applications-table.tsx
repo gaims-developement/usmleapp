@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { ArrowRight } from 'lucide-react'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
-import { StatusBadge, applicationPriorityMeta, reviewerAppStatusMeta } from '@/components/ui/status-badge'
+import { StatusBadge, reviewerAppStatusMeta } from '@/components/ui/status-badge'
 import { Avatar } from '@/components/ui/avatar'
 import { formatDate } from '@/lib/utils'
 import type { ReviewerApplication } from '@/mocks/reviewer/applications'
@@ -69,12 +69,6 @@ export function ReviewerApplicationsTable({
       header: 'Submission Date',
       sortValue: a => a.submittedAt,
       cell: a => <span className="text-ink-700">{formatDate(a.submittedAt)}</span>,
-    },
-    {
-      key: 'priority',
-      header: 'Priority',
-      sortValue: a => ({ high: 0, normal: 1, low: 2 }[a.priority]),
-      cell: a => <StatusBadge label={applicationPriorityMeta(a.priority).label} tone={applicationPriorityMeta(a.priority).tone} />,
     },
     {
       key: 'status',

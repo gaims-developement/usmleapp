@@ -5,6 +5,13 @@ import bcrypt from 'bcrypt'
 const adapter = new PrismaMariaDb(process.env.DATABASE_URL)
 const prisma = new PrismaClient({ adapter })
 
+// ---------------------------------------------------------------------------
+// Canonical roles, permissions, and role-permission grants.
+// These mirror the frontend constants in src/permissions/permissions.ts and
+// src/roles/roles.ts and are required for registration (ROLE_NOT_FOUND) and
+// for `authenticate` to resolve a user's role from the database.
+// ---------------------------------------------------------------------------
+
 const roleDefinitions = [
   { name: 'SUPER_ADMIN', description: 'Platform administrator' },
   { name: 'ADMIN', description: 'Operations administrator' },
@@ -59,6 +66,39 @@ const defaultRolePermissions = {
   HOSPITAL: ['applications.view', 'programs.manage', 'doctors.manage', 'students.manage'],
   DOCTOR: ['applications.view', 'students.manage', 'documents.verify'],
 }
+
+// ---------------------------------------------------------------------------
+// Demo environment (isDemo = true).
+//
+// Demo accounts live in a fully separate environment from real users:
+//   - every demo account is isDemo = true and carries a real role + profile
+//   - real users are isDemo = false and only ever see isDemo = false data
+//
+// The password below is the established demo convention. These are throwaway
+// dev/test accounts and are only surfaced through the devmode login page,
+// which is gated behind the ENABLE_DEVMODE environment variable.
+// ---------------------------------------------------------------------------
+
+const DEMO_PASSWORD = 'DemoPass@2024!'
+
+const DEMO_EMAIL = {
+  ADMIN: 'admin@demo.com',
+  HOSPITAL: 'hospital@demo.com',
+  DOCTOR: 'doctor@demo.com',
+  REVIEWER: 'reviewer@demo.com',
+  STUDENT: 'student@demo.com',
+}
+
+// Emails used by the previous seed generation. Only ever removed when the
+// account is still isDemo = true (a real user's account is never touched).
+const LEGACY_DEMO_EMAILS = [
+  'admin@imgprep.com',
+  'ops@imgprep.com',
+  'student@imgprep.com',
+  'reviewer@imgprep.com',
+  'doctor@imgprep.com',
+  'hospital@imgprep.com',
+]
 
 const mockElectives = [
   { id: 'im-beth-israel', specialty: 'Internal Medicine', hospital: 'Mount Sinai Beth Israel', city: 'New York', state: 'NY', fee: 1200, rating: 4.8, spots: 6, duration: '4, 8, 12 weeks', description: 'Hands-on inpatient ward rotations with an experienced teaching service.', eligibility: 'Clinical-year students and recent graduates', slug: 'im-beth-israel' },
@@ -145,129 +185,230 @@ async function seedDefaultMetadata() {
   }
 }
 
-async function seedRealSuperAdmin(passwordHash) {
-  console.log('Seeding real Super Admin account...')
-  const superAdminRole = await prisma.role.findUnique({ where: { name: 'SUPER_ADMIN' } })
-  if (!superAdminRole) {
-    throw new Error('SUPER_ADMIN role not configured')
+// ---------------------------------------------------------------------------
+// Real Super Admin (isDemo = false)
+//
+// This is a REAL account and is intentionally separate from the demo
+// environment. Its credentials come from the environment (never from the
+// frontend). In production the password MUST be provided explicitly.
+// ---------------------------------------------------------------------------
+async function seedSuperAdmin() {
+  const role = await prisma.role.findUnique({ where: { name: 'SUPER_ADMIN' } })
+  if (!role) {
+    throw new Error('SUPER_ADMIN role missing from database')
   }
-  await prisma.user.upsert({
-    where: { email: 'superadmin@imgprep.com' },
+
+  const email = (process.env.SUPER_ADMIN_EMAIL || 'superadmin@imgprep.com').toLowerCase()
+  const explicitPassword = process.env.SUPER_ADMIN_PASSWORD
+
+  if (process.env.NODE_ENV === 'production' && !explicitPassword) {
+    throw new Error(
+      'SUPER_ADMIN_PASSWORD must be set via the environment when seeding in production.',
+    )
+  }
+
+  // Dev-only default so a fresh local checkout is immediately usable. Always
+  // override via SUPER_ADMIN_PASSWORD outside of local development.
+  const passwordHash = await bcrypt.hash(explicitPassword || 'Admin@123', 12)
+
+  const user = await prisma.user.upsert({
+    where: { email },
     update: {
+      roleId: role.id,
       isDemo: false,
+      onboarded: true,
+      name: 'Super Administrator',
     },
     create: {
-      name: 'Super Admin Production',
-      email: 'superadmin@imgprep.com',
+      name: 'Super Administrator',
+      email,
       passwordHash,
-      roleId: superAdminRole.id,
+      roleId: role.id,
       onboarded: true,
       isDemo: false,
+      emailVerifiedAt: new Date(),
     },
   })
+
+  if (!explicitPassword) {
+    console.warn(
+      `Super admin "${email}" seeded with the default local password. ` +
+        'Set SUPER_ADMIN_PASSWORD via the environment in any non-local deployment.',
+    )
+  }
+
+  return user
+}
+
+async function removeLegacyDemoAccounts() {
+  const users = await prisma.user.findMany({
+    where: { email: { in: LEGACY_DEMO_EMAILS }, isDemo: true },
+    select: { id: true },
+  })
+  if (users.length === 0) return
+
+  const ids = users.map(u => u.id)
+  await prisma.announcement.deleteMany({ where: { authorId: { in: ids } } })
+  await prisma.user.deleteMany({ where: { id: { in: ids } } })
+  console.log(`Removed ${ids.length} legacy demo account(s) from the previous seed generation.`)
 }
 
 async function seedDemoUsers(passwordHash) {
   console.log('Seeding demo accounts...')
-  
-  const superAdminRole = await prisma.role.findUnique({ where: { name: 'SUPER_ADMIN' } })
+
   const adminRole = await prisma.role.findUnique({ where: { name: 'ADMIN' } })
+  const hospitalRole = await prisma.role.findUnique({ where: { name: 'HOSPITAL' } })
   const studentRole = await prisma.role.findUnique({ where: { name: 'STUDENT' } })
   const reviewerRole = await prisma.role.findUnique({ where: { name: 'REVIEWER' } })
   const doctorRole = await prisma.role.findUnique({ where: { name: 'DOCTOR' } })
 
-  if (!superAdminRole || !adminRole || !studentRole || !reviewerRole || !doctorRole) {
+  if (!adminRole || !hospitalRole || !studentRole || !reviewerRole || !doctorRole) {
     throw new Error('Required roles missing from database')
   }
 
-  const superAdmin = await prisma.user.upsert({
-    where: { email: 'admin@imgprep.com' },
+  // ADMIN demo
+  const admin = await prisma.user.upsert({
+    where: { email: DEMO_EMAIL.ADMIN },
     update: {
+      roleId: adminRole.id,
       isDemo: true,
-    },
-    create: {
-      name: 'Super Administrator (Demo)',
-      email: 'admin@imgprep.com',
-      passwordHash,
-      roleId: superAdminRole.id,
       onboarded: true,
-      isDemo: true,
-    },
-  })
-
-  await prisma.user.upsert({
-    where: { email: 'ops@imgprep.com' },
-    update: {
-      isDemo: true,
+      name: 'Alex Admin',
     },
     create: {
-      name: 'Alex Admin (Demo)',
-      email: 'ops@imgprep.com',
+      name: 'Alex Admin',
+      email: DEMO_EMAIL.ADMIN,
       passwordHash,
       roleId: adminRole.id,
       onboarded: true,
       isDemo: true,
+      emailVerifiedAt: new Date(),
     },
   })
 
-  await prisma.user.upsert({
-    where: { email: 'student@imgprep.com' },
+  // HOSPITAL demo (profile + org data are filled in seedDemoHospital)
+  const hospital = await prisma.user.upsert({
+    where: { email: DEMO_EMAIL.HOSPITAL },
     update: {
+      roleId: hospitalRole.id,
       isDemo: true,
+      onboarded: true,
+      name: 'St. Mary’s Medical Center',
     },
     create: {
-      name: 'Student Demo',
-      email: 'student@imgprep.com',
+      name: 'St. Mary’s Medical Center',
+      email: DEMO_EMAIL.HOSPITAL,
       passwordHash,
-      roleId: studentRole.id,
+      roleId: hospitalRole.id,
       onboarded: true,
       isDemo: true,
-      studentProfile: { create: { college: 'AFMC India', graduationYear: 2027 } },
+      emailVerifiedAt: new Date(),
     },
   })
 
-  await prisma.user.upsert({
-    where: { email: 'reviewer@imgprep.com' },
+  // DOCTOR demo (hospital/department association is filled in seedDemoHospital)
+  const doctor = await prisma.user.upsert({
+    where: { email: DEMO_EMAIL.DOCTOR },
     update: {
+      roleId: doctorRole.id,
       isDemo: true,
-    },
-    create: {
-      name: 'Rita Reviewer',
-      email: 'reviewer@imgprep.com',
-      passwordHash,
-      roleId: reviewerRole.id,
       onboarded: true,
-      isDemo: true,
-      reviewerProfile: { create: { specialty: 'Pediatrics', department: 'Pediatric Education' } },
-    },
-  })
-
-  await prisma.user.upsert({
-    where: { email: 'doctor@imgprep.com' },
-    update: {
-      isDemo: true,
+      name: 'Dr. Michael Mentor',
     },
     create: {
       name: 'Dr. Michael Mentor',
-      email: 'doctor@imgprep.com',
+      email: DEMO_EMAIL.DOCTOR,
       passwordHash,
       roleId: doctorRole.id,
       onboarded: true,
       isDemo: true,
-      doctorProfile: {
-        create: {
-          specialty: 'Internal Medicine',
-          email: 'doctor@imgprep.com',
-          phone: '+1-555-0200',
-          status: 'active',
-        },
-      },
+      emailVerifiedAt: new Date(),
+    },
+  })
+
+  await prisma.doctorProfile.upsert({
+    where: { userId: doctor.id },
+    update: {},
+    create: {
+      userId: doctor.id,
+      specialty: 'Internal Medicine',
+      email: DEMO_EMAIL.DOCTOR,
+      phone: '+1-555-0200',
+      status: 'active',
+    },
+  })
+
+  // REVIEWER demo
+  const reviewer = await prisma.user.upsert({
+    where: { email: DEMO_EMAIL.REVIEWER },
+    update: {
+      roleId: reviewerRole.id,
+      isDemo: true,
+      onboarded: true,
+      name: 'Rita Reviewer',
+    },
+    create: {
+      name: 'Rita Reviewer',
+      email: DEMO_EMAIL.REVIEWER,
+      passwordHash,
+      roleId: reviewerRole.id,
+      onboarded: true,
+      isDemo: true,
+      emailVerifiedAt: new Date(),
+    },
+  })
+
+  await prisma.reviewerProfile.upsert({
+    where: { userId: reviewer.id },
+    update: {},
+    create: {
+      userId: reviewer.id,
+      specialty: 'Pediatrics',
+      department: 'Pediatric Education',
+      timezone: 'America/New_York',
+      title: 'Senior Reviewer',
+      institution: 'St. Mary’s Medical Center',
+      yearsOfExperience: 12,
+    },
+  })
+
+  // STUDENT demo
+  const student = await prisma.user.upsert({
+    where: { email: DEMO_EMAIL.STUDENT },
+    update: {
+      roleId: studentRole.id,
+      isDemo: true,
+      onboarded: true,
+      name: 'Student Demo',
+    },
+    create: {
+      name: 'Student Demo',
+      email: DEMO_EMAIL.STUDENT,
+      passwordHash,
+      roleId: studentRole.id,
+      onboarded: true,
+      isDemo: true,
+      emailVerifiedAt: new Date(),
+    },
+  })
+
+  await prisma.studentProfile.upsert({
+    where: { userId: student.id },
+    update: {},
+    create: {
+      userId: student.id,
+      college: 'AFMC India',
+      graduationYear: 2027,
+      visaStatus: 'F-1 (pending)',
+      earliestStart: new Date('2027-01-01T00:00:00.000Z'),
+      durationPreference: 4,
+      travelReady: true,
     },
   })
 
   await prisma.announcement.create({
     data: {
-      authorId: superAdmin.id,
+      authorId: admin.id,
       title: 'New residency cycle opening',
       body: 'Applications for the next clinical cycle are now open.',
       status: 'PUBLISHED',
@@ -277,31 +418,16 @@ async function seedDemoUsers(passwordHash) {
   }).catch(() => {})
 }
 
-async function seedDemoHospitals(passwordHash) {
-  console.log('Seeding demo hospital and elective programs...')
-  const hospitalRole = await prisma.role.findUnique({ where: { name: 'HOSPITAL' } })
-  if (!hospitalRole) {
-    throw new Error('HOSPITAL role missing from database')
-  }
+async function seedDemoHospital() {
+  console.log('Seeding demo hospital, departments, doctors and elective programs...')
 
-  const hospitalUser = await prisma.user.upsert({
-    where: { email: 'hospital@imgprep.com' },
-    update: {
-      isDemo: true,
-    },
-    create: {
-      name: 'St. Mary’s Medical Center',
-      email: 'hospital@imgprep.com',
-      passwordHash,
-      roleId: hospitalRole.id,
-      onboarded: true,
-      isDemo: true,
-    },
+  const hospitalUser = await prisma.user.findUnique({
+    where: { email: DEMO_EMAIL.HOSPITAL },
+    include: { hospitalProfile: true },
   })
+  if (!hospitalUser) throw new Error('Demo hospital user not found')
 
-  let hospitalProfile = await prisma.hospitalProfile.findFirst({
-    where: { userId: hospitalUser.id }
-  })
+  let hospitalProfile = hospitalUser.hospitalProfile
   if (!hospitalProfile) {
     hospitalProfile = await prisma.hospitalProfile.create({
       data: {
@@ -310,15 +436,61 @@ async function seedDemoHospitals(passwordHash) {
         city: 'Boston',
         state: 'MA',
         country: 'USA',
-        email: 'hospital@imgprep.com',
+        email: DEMO_EMAIL.HOSPITAL,
         phone: '+1-555-0100',
         coordinatorName: 'Alex Coordinator',
         coordinatorEmail: 'coordinator@stmarys.org',
+        description:
+          'A teaching medical center hosting clinical elective rotations for international medical graduates.',
+        website: 'https://stmarys.example.org',
+        tier: 'Community teaching hospital',
         status: 'active',
-      }
+      },
     })
   }
 
+  // Departments
+  const demoDepartments = ['Internal Medicine', 'Pediatrics', 'General Surgery', 'Family Medicine']
+  const departmentIds = new Map()
+  for (const deptName of demoDepartments) {
+    const dept = await prisma.department.upsert({
+      where: { hospitalId_name: { hospitalId: hospitalProfile.id, name: deptName } },
+      update: {},
+      create: { hospitalId: hospitalProfile.id, name: deptName },
+    })
+    departmentIds.set(deptName, dept.id)
+  }
+
+  // Hospital registration code (used to onboard real + demo doctors)
+  await prisma.hospitalRegistrationCode.upsert({
+    where: { code: 'HOSP-DEMO01' },
+    update: { isActive: true, hospitalId: hospitalProfile.id },
+    create: {
+      hospitalId: hospitalProfile.id,
+      code: 'HOSP-DEMO01',
+      isActive: true,
+    },
+  })
+
+  // Demo doctor linked to the demo hospital + Internal Medicine department
+  const doctorUser = await prisma.user.findUnique({
+    where: { email: DEMO_EMAIL.DOCTOR },
+    include: { doctorProfile: true },
+  })
+  if (doctorUser?.doctorProfile) {
+    await prisma.doctorProfile.update({
+      where: { id: doctorUser.doctorProfile.id },
+      data: {
+        hospitalId: hospitalProfile.id,
+        departmentId: departmentIds.get('Internal Medicine') ?? null,
+        title: 'Attending Physician',
+        licenseNumber: 'MA-887766',
+        status: 'active',
+      },
+    })
+  }
+
+  // Elective programs owned by the demo hospital
   for (const mockEl of mockElectives) {
     const existingProg = await prisma.program.findFirst({ where: { slug: mockEl.slug } })
     if (!existingProg) {
@@ -326,6 +498,7 @@ async function seedDemoHospitals(passwordHash) {
         data: {
           id: mockEl.id,
           hospitalId: hospitalProfile.id,
+          creatorId: hospitalUser.id,
           title: mockEl.specialty + ' Rotation',
           department: 'Medicine',
           specialty: mockEl.specialty,
@@ -339,27 +512,50 @@ async function seedDemoHospitals(passwordHash) {
           eligibility: mockEl.eligibility,
           status: 'ACTIVE',
           slug: mockEl.slug,
-        }
+        },
       })
     }
   }
 }
 
+async function seedDemoReviewerWorkflow() {
+  console.log('Seeding demo reviewer invitation code...')
+  await prisma.reviewerInvitationCode.upsert({
+    where: { code: 'REV-DEMO01' },
+    update: { isActive: true },
+    create: {
+      code: 'REV-DEMO01',
+      isActive: true,
+    },
+  })
+}
+
 async function seedDemoApplications() {
   console.log('Seeding demo applications...')
   const studentUser = await prisma.user.findUnique({
-    where: { email: 'student@imgprep.com' },
+    where: { email: DEMO_EMAIL.STUDENT },
     include: { studentProfile: true },
   })
-
   if (!studentUser?.studentProfile) return
 
   const studentProfileId = studentUser.studentProfile.id
 
+  const reviewerUser = await prisma.user.findUnique({
+    where: { email: DEMO_EMAIL.REVIEWER },
+    include: { reviewerProfile: true },
+  })
+  const reviewerProfileId = reviewerUser?.reviewerProfile?.id ?? null
+
+  const doctorUser = await prisma.user.findUnique({
+    where: { email: DEMO_EMAIL.DOCTOR },
+    include: { doctorProfile: true },
+  })
+  const doctorProfileId = doctorUser?.doctorProfile?.id ?? null
+
   const demoApps = [
-    { id: 'app-1001', programId: 'im-beth-israel', status: 'SUBMITTED', startDate: new Date('2026-10-05') },
-    { id: 'app-1002', programId: 'gs-mgh', status: 'UNDER_REVIEW', startDate: new Date('2027-01-11') },
-    { id: 'app-1003', programId: 'peds-lurie', status: 'ACCEPTED', startDate: new Date('2027-04-05') },
+    { id: 'app-1001', programId: 'im-beth-israel', status: 'SUBMITTED', startDate: new Date('2026-10-05'), assignReviewer: false, assignDoctor: false },
+    { id: 'app-1002', programId: 'gs-mgh', status: 'UNDER_REVIEW', startDate: new Date('2027-01-11'), assignReviewer: true, assignDoctor: false },
+    { id: 'app-1003', programId: 'peds-lurie', status: 'ACCEPTED', startDate: new Date('2027-04-05'), assignReviewer: true, assignDoctor: true },
   ]
 
   for (const app of demoApps) {
@@ -369,6 +565,8 @@ async function seedDemoApplications() {
         data: {
           id: app.id,
           studentProfileId,
+          reviewerProfileId: app.assignReviewer ? reviewerProfileId : null,
+          doctorProfileId: app.assignDoctor ? doctorProfileId : null,
           programId: app.programId,
           status: app.status,
           startDate: app.startDate,
@@ -378,10 +576,36 @@ async function seedDemoApplications() {
             create: [
               { name: 'Passport', verification: 'VERIFIED' },
               { name: 'CV / Resume', verification: 'VERIFIED' },
-            ]
-          }
-        }
+            ],
+          },
+        },
       })
+    } else {
+      await prisma.application.update({
+        where: { id: app.id },
+        data: {
+          reviewerProfileId: app.assignReviewer ? reviewerProfileId : exists.reviewerProfileId,
+          doctorProfileId: app.assignDoctor ? doctorProfileId : exists.doctorProfileId,
+        },
+      })
+    }
+
+    // A completed review on the accepted application so the reviewer profile has history.
+    if (app.id === 'app-1003' && reviewerProfileId) {
+      const existingReview = await prisma.applicationReview.findFirst({
+        where: { applicationId: app.id, reviewerProfileId },
+      })
+      if (!existingReview) {
+        await prisma.applicationReview.create({
+          data: {
+            applicationId: app.id,
+            reviewerProfileId,
+            recommendation: 'APPROVE',
+            reviewerNotes: 'Strong clinical background, all documents verified.',
+            reviewMinutes: 25,
+          },
+        })
+      }
     }
   }
 }
@@ -389,10 +613,9 @@ async function seedDemoApplications() {
 async function seedDemoDocuments() {
   console.log('Seeding demo documents...')
   const studentUser = await prisma.user.findUnique({
-    where: { email: 'student@imgprep.com' },
+    where: { email: DEMO_EMAIL.STUDENT },
     include: { studentProfile: true },
   })
-
   if (!studentUser?.studentProfile) return
 
   const studentProfileId = studentUser.studentProfile.id
@@ -416,7 +639,7 @@ async function seedDemoDocuments() {
           status: doc.status,
           fileName: doc.fileName,
           uploadedAt: new Date(),
-        }
+        },
       })
     }
   }
@@ -425,10 +648,9 @@ async function seedDemoDocuments() {
 async function seedDemoPayments() {
   console.log('Seeding demo payments...')
   const studentUser = await prisma.user.findUnique({
-    where: { email: 'student@imgprep.com' },
+    where: { email: DEMO_EMAIL.STUDENT },
     include: { studentProfile: true },
   })
-
   if (!studentUser || !studentUser.studentProfile) return
 
   const apps = await prisma.application.findMany({
@@ -447,7 +669,7 @@ async function seedDemoPayments() {
           transactionId: `ch_${Math.random().toString(36).substring(7)}`,
           status: 'PAID',
           submittedAt: new Date(),
-        }
+        },
       })
     }
   }
@@ -456,9 +678,8 @@ async function seedDemoPayments() {
 async function seedDemoNotifications() {
   console.log('Seeding demo notifications...')
   const studentUser = await prisma.user.findUnique({
-    where: { email: 'student@imgprep.com' },
+    where: { email: DEMO_EMAIL.STUDENT },
   })
-
   if (!studentUser) return
 
   const demoNotifs = [
@@ -477,7 +698,7 @@ async function seedDemoNotifications() {
           tone: 'SUCCESS',
           title: notif.title,
           body: notif.body,
-        }
+        },
       })
     }
   }
@@ -486,15 +707,13 @@ async function seedDemoNotifications() {
 async function seedDemoPlanner() {
   console.log('Seeding demo planner...')
   const studentUser = await prisma.user.findUnique({
-    where: { email: 'student@imgprep.com' },
+    where: { email: DEMO_EMAIL.STUDENT },
   })
-
   if (!studentUser) return
 
   const exists = await prisma.calendarEvent.findFirst({
     where: { createdById: studentUser.id },
   })
-
   if (!exists) {
     await prisma.calendarEvent.create({
       data: {
@@ -504,24 +723,24 @@ async function seedDemoPlanner() {
         startAt: new Date('2027-04-05T08:00:00.000Z'),
         endAt: new Date('2027-04-05T12:00:00.000Z'),
         location: 'Lurie Children’s Hospital, Chicago',
-      }
+      },
     })
   }
 }
 
 async function main() {
   await seedDefaultMetadata()
-
-  const passwordHash = await bcrypt.hash('Admin@123', 12)
-
-  // Seed production Super Admin unconditionally
-  await seedRealSuperAdmin(passwordHash)
+  await seedSuperAdmin()
 
   const enableDemoData = process.env.ENABLE_DEMO_DATA !== 'false'
-  
+
   if (enableDemoData) {
+    await removeLegacyDemoAccounts()
+
+    const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 12)
     await seedDemoUsers(passwordHash)
-    await seedDemoHospitals(passwordHash)
+    await seedDemoHospital()
+    await seedDemoReviewerWorkflow()
     await seedDemoApplications()
     await seedDemoDocuments()
     await seedDemoPayments()

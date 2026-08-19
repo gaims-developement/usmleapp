@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>receipt-verify</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background: #fff;
+      }
+      img.receipt {
+        display: block;
+        width: 1200px;
+        height: 1600px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="status" style="display: none">pending</div>
+    <script type="module">
+      import {
+        drawReceipt,
+        createReceiptCanvas,
+        receiptBlob,
+        receiptFilename,
+        RECEIPT_WIDTH,
+        RECEIPT_HEIGHT,
+      } from '/src/lib/receipt.ts'
+
+      const scenarios = {
+        paid: {
+          id: 'pay_cmabcdef12345678',
+          applicationId: 'app_cm20260012345678',
+          receiptNumber: 'IMG-REC-12345678',
+          studentName: 'Ashutosh Shinde',
+          studentEmail: 'ashutosh.shinde@student.university.edu',
+          specialty: 'IM Clerkship',
+          hospital: 'Lurie Children Hospital, Chicago',
+          amount: 2500,
+          currency: 'USD',
+          submittedAt: '2026-08-12',
+          paidAt: '2026-08-12',
+          status: 'paid',
+          paymentMethod: 'upi',
+          transactionId: 'UTR001234567890',
+        },
+        wrapped: {
+          id: 'pay_cmtestwrap00000001',
+          applicationId: 'app_cm2026wrap1234567',
+          receiptNumber: 'IMG-REC-WRAP0001',
+          studentName: 'Sofia Rodriguez Martinez',
+          studentEmail: 'sofia.rodriguez.martinez@universityhospital.example.edu.in',
+          specialty: 'Internal Medicine - Cardiology Sub-Internship',
+          hospital: 'Massachusetts General Hospital and Brigham and Womens Hospital Consortium',
+          amount: 2500.5,
+          currency: 'USD',
+          submittedAt: '2026-08-11',
+          paidAt: '2026-08-11',
+          status: 'paid',
+          paymentMethod: 'bank_transfer',
+          transactionId: 'IMPS/2026/0009/8888',
+        },
+        pending: {
+          id: 'pay_cmpending00000002',
+          applicationId: 'app_cm2026pend1234567',
+          receiptNumber: 'IMG-REC-PEND0002',
+          studentName: 'Ravi Kumar',
+          studentEmail: 'ravi.kumar@student.com',
+          specialty: 'Pediatrics Clerkship',
+          hospital: 'Texas Childrens Hospital, Houston',
+          amount: 1800,
+          currency: 'USD',
+          submittedAt: '2026-08-10',
+          paidAt: '2026-08-10',
+          status: 'under_verification',
+          paymentMethod: 'razorpay',
+          transactionId: 'pay_rzp_9988776655',
+        },
+      }
+
+      function makeMockCtx(calls) {
+        let font = '16px Inter'
+        return {
+          canvas: { height: RECEIPT_HEIGHT },
+          fillStyle: '',
+          strokeStyle: '',
+          lineWidth: 0,
+          textAlign: 'left',
+          textBaseline: 'alphabetic',
+          set font(v) {
+            font = v
+          },
+          get font() {
+            return font
+          },
+          measureText(text) {
+            const size = Number((font.match(/(\d+)px/) || [0, 16])[1]) || 16
+            return { width: text.length * size * 0.55 }
+          },
+          fillText(text, x, y) {
+            calls.text.push({ text, x, y })
+          },
+          strokeText() {},
+          fillRect(x, y, w, h) {
+            calls.rect.push({ x, y, w, h, fill: true })
+          },
+          strokeRect(x, y, w, h) {
+            calls.rect.push({ x, y, w, h, fill: false })
+          },
+          clearRect() {},
+          beginPath() {},
+          moveTo() {},
+          lineTo() {},
+          stroke() {},
+        }
+      }
+
+      function fontSize(font) {
+        return Number((font.match(/(\d+)px/) || [0, 16])[1]) || 16
+      }
+
+      function rectsOverlap(a, b) {
+        return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y
+      }
+
+      function audit(scenario) {
+        const errors = []
+        const calls = { text: [], rect: [] }
+        const ctx = makeMockCtx(calls)
+        const used = drawReceipt(ctx, scenario)
+
+        for (const t of calls.text) {
+          if (t.y < 0 || t.y > RECEIPT_HEIGHT) {
+            errors.push(`text out of bounds: ${t.text.slice(0, 32)} y=${t.y}`)
+          }
+        }
+
+        const banner = calls.rect.find(r => r.fill && r.h === 90)
+        if (banner) {
+          for (const t of calls.text) {
+            const size = fontSize(ctx.font)
+            const textBox = { x: t.x - 4, y: t.y - size - 4, w: ctx.measureText(t.text).width + 8, h: size + 8 }
+            if (rectsOverlap(textBox, banner)) {
+              errors.push(`text overlaps banner: ${t.text.slice(0, 28)}`)
+            }
+          }
+          if (banner.y + banner.h > RECEIPT_HEIGHT - 24) errors.push('banner exceeds canvas bounds')
+        } else {
+          errors.push('no success/record banner box found')
+        }
+
+        if (used > RECEIPT_HEIGHT - 12) errors.push(`drawReceipt used y=${used} exceeding canvas`)
+
+        return { errors, used, bannerY: banner ? banner.y : null, textCount: calls.text.length }
+      }
+
+      async function run() {
+        const status = { ok: true, errors: [], results: [] }
+        const keys = Object.keys(scenarios)
+
+        for (const key of keys) {
+          const payment = scenarios[key]
+          const item = { name: key }
+          try {
+            const blob = await receiptBlob(payment)
+            const buf = await blob.arrayBuffer()
+            const bytes = new Uint8Array(buf)
+            const sig =
+              bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47
+            item.pngSignature = sig
+            item.size = buf.byteLength
+            item.filename = receiptFilename(payment)
+            if (!sig) item.errors = (item.errors ?? []).concat('Bad PNG signature')
+            if (buf.byteLength < 1000) item.errors = (item.errors ?? []).concat('Suspiciously small PNG')
+            const a = audit(payment)
+            item.audit = a
+            if (a.errors.length > 0) item.errors = (item.errors ?? []).concat(a.errors)
+          } catch (err) {
+            item.errors = (item.errors ?? []).concat(String(err))
+          }
+          status.results.push(item)
+          if ((item.errors ?? []).length > 0) status.ok = false
+        }
+
+        const only = new URLSearchParams(window.location.search).get('s')
+        if (only && scenarios[only]) {
+          const canvas = await createReceiptCanvas(scenarios[only])
+          const img = document.createElement('img')
+          img.className = 'receipt'
+          img.src = canvas.toDataURL('image/png')
+          img.alt = `receipt-${only}`
+          document.body.appendChild(img)
+        }
+
+        document.getElementById('status').textContent = JSON.stringify(status)
+        document.title = 'DONE ' + status.ok
+      }
+
+      run().catch(err => {
+        document.getElementById('status').textContent = JSON.stringify({ ok: false, errors: [String(err)] })
+        document.title = 'DONE false'
+      })
+    </script>
+  </body>
+</html>

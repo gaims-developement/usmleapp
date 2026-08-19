@@ -3,11 +3,10 @@ import { LayoutDashboard } from 'lucide-react'
 import { PublicLayout } from '@/components/layout/public-layout'
 import { AppLayout, type AppNavItem } from '@/components/layout/app-layout'
 import { adminNav, superAdminNav } from '@/components/layout/admin-nav'
-import { reviewerNav } from '@/components/layout/reviewer-nav'
-import { hospitalNav } from '@/components/layout/hospital-nav'
-import { doctorNav } from '@/components/layout/doctor-nav'
+import { HospitalLayout } from '@/components/layout/hospital-layout'
 import { studentNav } from '@/components/layout/student-nav'
 import { RequireAuth } from '@/guards/RequireAuth'
+import { AuthenticatedForumLayout } from '@/components/layout/authenticated-forum-layout'
 import { RequireOnboarding } from '@/guards/RequireOnboarding'
 import { RequireRole } from '@/guards/RequireRole'
 import { RequireStudent } from '@/guards/RequireStudent'
@@ -18,6 +17,17 @@ import { DevModePage } from '@/pages/devmode-page'
 import { SignupPage } from '@/pages/signup-page'
 import { PartnerRegisterPage } from '@/pages/partner-register-page'
 import { PartnerPendingPage } from '@/pages/partner-pending-page'
+import { RegisterHospitalPage } from '@/pages/register-hospital-page'
+import { RegisterDoctorPage } from '@/pages/register-doctor-page'
+import { RegisterReviewerPage } from '@/pages/register-reviewer-page'
+import { AdministrativeRegisterPage } from '@/pages/administrative-register-page'
+import { AccountPendingPage } from '@/pages/account-pending-page'
+import { RequireActiveHospital } from '@/guards/RequireActiveHospital'
+import { RequireActiveDoctor } from '@/guards/RequireActiveDoctor'
+import { RequireActiveReviewer } from '@/guards/RequireActiveReviewer'
+import { DoctorLayout } from '@/components/layout/doctor-layout'
+import { ReviewerLayout } from '@/components/layout/reviewer-layout'
+import { RequireAdminRegistrationGate } from '@/guards/RequireAdminRegistrationGate'
 import { ContactPage } from '@/pages/contact-page'
 import { PrivacyPage } from '@/pages/privacy-page'
 import { TermsPage } from '@/pages/terms-page'
@@ -30,11 +40,13 @@ import { ElectiveDetailsPage } from '@/pages/elective-details-page'
 import { ApplyPage } from '@/pages/apply-page'
 import { ApplicationsPage } from '@/pages/applications-page'
 import { ApplicationTrackerPage } from '@/pages/application-tracker-page'
+import { PaymentsPage } from '@/pages/payments-page'
 import { DocumentsPage } from '@/pages/documents-page'
 import { StudyPlannerPage } from '@/pages/study-planner-page'
 import { AnnouncementsPage } from '@/pages/announcements-page'
 import { StudentProfilePage } from '@/pages/student-profile-page'
 import { StudentSettingsPage } from '@/pages/student-settings-page'
+import { LogbookPage } from '@/pages/logbook-page'
 import { SuperAdminOverviewPage } from '@/pages/super-admin/overview'
 import { SuperAdminAnalyticsPage } from '@/pages/super-admin/analytics'
 import { SuperAdminUsersPage } from '@/pages/super-admin/users'
@@ -73,6 +85,8 @@ import { ReviewerDocumentsPage } from '@/pages/reviewer/documents'
 import { ReviewerMessagesPage } from '@/pages/reviewer/messages'
 import { ReviewerProfilePage } from '@/pages/reviewer/profile'
 import { HospitalOverviewPage } from '@/pages/hospital/overview'
+import { HospitalPendingRegistrationsPage } from '@/pages/hospital/pending-registrations-page'
+import { HospitalOrganizationPage } from '@/pages/hospital/organization-page'
 import { HospitalApplicationsPage } from '@/pages/hospital/applications'
 import { HospitalApplicationDetailPage } from '@/pages/hospital/application-detail'
 import { HospitalProgramsPage } from '@/pages/hospital/programs'
@@ -94,6 +108,12 @@ import { DoctorLettersPage } from '@/pages/doctor/letters'
 import { DoctorCertificatesPage } from '@/pages/doctor/certificates'
 import { DoctorMessagesPage } from '@/pages/doctor/messages'
 import { DoctorProfilePage } from '@/pages/doctor/profile'
+import { ForumHomePage } from '@/pages/forum/forum-home-page'
+import { ForumNewPostPage } from '@/pages/forum/forum-new-post-page'
+import { ForumPostPage } from '@/pages/forum/forum-post-page'
+import { ForumBookmarksPage } from '@/pages/forum/forum-bookmarks-page'
+import { ForumMyPostsPage } from '@/pages/forum/forum-my-posts-page'
+import { ForumModerationPage } from '@/pages/forum/forum-moderation-page'
 
 const staffNav: AppNavItem[] = [{ to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard }]
 
@@ -111,13 +131,33 @@ export const router = createBrowserRouter([
   { path: '/devmode', element: <DevModePage /> },
   { path: '/register', element: <SignupPage /> },
   { path: '/signup', element: <SignupPage /> },
+  { path: '/register/administrative', element: <AdministrativeRegisterPage /> },
+  {
+    element: <RequireAdminRegistrationGate />,
+    children: [
+      { path: '/register/hospital', element: <RegisterHospitalPage /> },
+      { path: '/register/doctor', element: <RegisterDoctorPage /> },
+      { path: '/register/reviewer', element: <RegisterReviewerPage /> },
+    ],
+  },
   { path: '/partner-register', element: <PartnerRegisterPage /> },
   { path: '/partner-register/success', element: <PartnerPendingPage /> },
   {
     element: <RequireAuth />,
     children: [
       { path: '/dashboard', element: <DashboardRoute /> },
+      { path: '/account/pending', element: <AccountPendingPage /> },
       { path: '/onboarding', element: <RequireOnboarding />, children: [{ index: true, element: <OnboardingPage /> }] },
+      {
+        element: <AuthenticatedForumLayout />,
+        children: [
+          { path: '/forum', element: <ForumHomePage /> },
+          { path: '/forum/new', element: <ForumNewPostPage /> },
+          { path: '/forum/post/:id', element: <ForumPostPage /> },
+          { path: '/forum/bookmarks', element: <ForumBookmarksPage /> },
+          { path: '/forum/mine', element: <ForumMyPostsPage /> },
+        ],
+      },
       {
         element: <RequireStudent />,
         children: [
@@ -130,7 +170,9 @@ export const router = createBrowserRouter([
               { path: '/apply/:id', element: <ApplyPage /> },
               { path: '/applications', element: <ApplicationsPage /> },
               { path: '/applications/:id', element: <ApplicationTrackerPage /> },
+              { path: '/payments', element: <PaymentsPage /> },
               { path: '/documents', element: <DocumentsPage /> },
+              { path: '/logbook', element: <LogbookPage /> },
               { path: '/planner', element: <StudyPlannerPage /> },
               { path: '/resources', element: <StudyPlannerPage /> },
               { path: '/announcements', element: <AnnouncementsPage /> },
@@ -158,6 +200,7 @@ export const router = createBrowserRouter([
               { path: '/dashboard/super-admin/payments', element: <SuperAdminPaymentsPage /> },
               { path: '/dashboard/super-admin/announcements', element: <SuperAdminAnnouncementsPage /> },
               { path: '/dashboard/super-admin/cms', element: <SuperAdminCmsPage /> },
+              { path: '/dashboard/super-admin/forum', element: <ForumModerationPage /> },
               { path: '/dashboard/super-admin/roles', element: <SuperAdminRolesPage /> },
               { path: '/dashboard/super-admin/audit-logs', element: <SuperAdminAuditLogsPage /> },
               { path: '/dashboard/super-admin/support', element: <SuperAdminSupportPage /> },
@@ -182,6 +225,7 @@ export const router = createBrowserRouter([
               { path: '/dashboard/admin/programs', element: <AdminProgramsPage /> },
               { path: '/dashboard/admin/announcements', element: <AdminAnnouncementsPage /> },
               { path: '/dashboard/admin/support', element: <AdminSupportPage /> },
+              { path: '/dashboard/admin/forum', element: <ForumModerationPage /> },
               { path: '/dashboard/admin/reports', element: <AdminReportsPage /> },
               { path: '/dashboard/admin/demo-data', element: <DemoDataPage /> },
               { path: '/dashboard/admin/profile', element: <AdminProfilePage /> },
@@ -193,17 +237,22 @@ export const router = createBrowserRouter([
         element: <RequireRole roles={['REVIEWER']} />,
         children: [
           {
-            element: <AppLayout nav={reviewerNav} />,
+            element: <ReviewerLayout />,
             children: [
               { path: '/dashboard/reviewer', element: <ReviewerOverviewPage /> },
-              { path: '/dashboard/reviewer/applications', element: <ReviewerApplicationsPage /> },
-              { path: '/dashboard/reviewer/applications/:id', element: <ReviewerApplicationDetailPage /> },
-              { path: '/dashboard/reviewer/pending', element: <ReviewerPendingPage /> },
-              { path: '/dashboard/reviewer/approved', element: <ReviewerApprovedPage /> },
-              { path: '/dashboard/reviewer/rejected', element: <ReviewerRejectedPage /> },
-              { path: '/dashboard/reviewer/documents', element: <ReviewerDocumentsPage /> },
-              { path: '/dashboard/reviewer/messages', element: <ReviewerMessagesPage /> },
-              { path: '/dashboard/reviewer/profile', element: <ReviewerProfilePage /> },
+              {
+                element: <RequireActiveReviewer />,
+                children: [
+                  { path: '/dashboard/reviewer/applications', element: <ReviewerApplicationsPage /> },
+                  { path: '/dashboard/reviewer/applications/:id', element: <ReviewerApplicationDetailPage /> },
+                  { path: '/dashboard/reviewer/pending', element: <ReviewerPendingPage /> },
+                  { path: '/dashboard/reviewer/approved', element: <ReviewerApprovedPage /> },
+                  { path: '/dashboard/reviewer/rejected', element: <ReviewerRejectedPage /> },
+                  { path: '/dashboard/reviewer/documents', element: <ReviewerDocumentsPage /> },
+                  { path: '/dashboard/reviewer/messages', element: <ReviewerMessagesPage /> },
+                  { path: '/dashboard/reviewer/profile', element: <ReviewerProfilePage /> },
+                ],
+              },
             ],
           },
         ],
@@ -212,20 +261,27 @@ export const router = createBrowserRouter([
         element: <RequireRole roles={['HOSPITAL']} />,
         children: [
           {
-            element: <AppLayout nav={hospitalNav} />,
+            element: <HospitalLayout />,
             children: [
               { path: '/dashboard/hospital', element: <HospitalOverviewPage /> },
-              { path: '/dashboard/hospital/programs', element: <HospitalProgramsPage /> },
-              { path: '/dashboard/hospital/programs/new', element: <HospitalProgramDetailPage /> },
-              { path: '/dashboard/hospital/programs/:id', element: <HospitalProgramDetailPage /> },
-              { path: '/dashboard/hospital/applications', element: <HospitalApplicationsPage /> },
-              { path: '/dashboard/hospital/applications/:id', element: <HospitalApplicationDetailPage /> },
-              { path: '/dashboard/hospital/rotations', element: <HospitalRotationsPage /> },
-              { path: '/dashboard/hospital/doctors', element: <HospitalDoctorsPage /> },
-              { path: '/dashboard/hospital/students', element: <HospitalStudentsPage /> },
-              { path: '/dashboard/hospital/calendar', element: <HospitalCalendarPage /> },
               { path: '/dashboard/hospital/announcements', element: <HospitalAnnouncementsPage /> },
-              { path: '/dashboard/hospital/profile', element: <HospitalProfilePage /> },
+              {
+                element: <RequireActiveHospital />,
+                children: [
+                  { path: '/dashboard/hospital/programs', element: <HospitalProgramsPage /> },
+                  { path: '/dashboard/hospital/programs/new', element: <HospitalProgramDetailPage /> },
+                  { path: '/dashboard/hospital/programs/:id', element: <HospitalProgramDetailPage /> },
+                  { path: '/dashboard/hospital/applications', element: <HospitalApplicationsPage /> },
+                  { path: '/dashboard/hospital/applications/:id', element: <HospitalApplicationDetailPage /> },
+                  { path: '/dashboard/hospital/rotations', element: <HospitalRotationsPage /> },
+                  { path: '/dashboard/hospital/doctors', element: <HospitalDoctorsPage /> },
+                  { path: '/dashboard/hospital/pending', element: <HospitalPendingRegistrationsPage /> },
+                  { path: '/dashboard/hospital/students', element: <HospitalStudentsPage /> },
+                  { path: '/dashboard/hospital/calendar', element: <HospitalCalendarPage /> },
+                  { path: '/dashboard/hospital/organization', element: <HospitalOrganizationPage /> },
+                  { path: '/dashboard/hospital/profile', element: <HospitalProfilePage /> },
+                ],
+              },
             ],
           },
         ],
@@ -234,19 +290,24 @@ export const router = createBrowserRouter([
         element: <RequireRole roles={['DOCTOR']} />,
         children: [
           {
-            element: <AppLayout nav={doctorNav} />,
+            element: <DoctorLayout />,
             children: [
               { path: '/dashboard/doctor', element: <DoctorOverviewPage /> },
-              { path: '/dashboard/doctor/students', element: <DoctorStudentsPage /> },
-              { path: '/dashboard/doctor/students/:id', element: <DoctorStudentDetailPage /> },
-              { path: '/dashboard/doctor/rotations', element: <DoctorRotationsPage /> },
-              { path: '/dashboard/doctor/schedule', element: <DoctorSchedulePage /> },
-              { path: '/dashboard/doctor/logbooks', element: <DoctorLogbooksPage /> },
-              { path: '/dashboard/doctor/evaluations', element: <DoctorEvaluationsPage /> },
-              { path: '/dashboard/doctor/letters', element: <DoctorLettersPage /> },
-              { path: '/dashboard/doctor/certificates', element: <DoctorCertificatesPage /> },
-              { path: '/dashboard/doctor/messages', element: <DoctorMessagesPage /> },
-              { path: '/dashboard/doctor/profile', element: <DoctorProfilePage /> },
+              {
+                element: <RequireActiveDoctor />,
+                children: [
+                  { path: '/dashboard/doctor/students', element: <DoctorStudentsPage /> },
+                  { path: '/dashboard/doctor/students/:id', element: <DoctorStudentDetailPage /> },
+                  { path: '/dashboard/doctor/rotations', element: <DoctorRotationsPage /> },
+                  { path: '/dashboard/doctor/schedule', element: <DoctorSchedulePage /> },
+                  { path: '/dashboard/doctor/logbooks', element: <DoctorLogbooksPage /> },
+                  { path: '/dashboard/doctor/evaluations', element: <DoctorEvaluationsPage /> },
+                  { path: '/dashboard/doctor/letters', element: <DoctorLettersPage /> },
+                  { path: '/dashboard/doctor/certificates', element: <DoctorCertificatesPage /> },
+                  { path: '/dashboard/doctor/messages', element: <DoctorMessagesPage /> },
+                  { path: '/dashboard/doctor/profile', element: <DoctorProfilePage /> },
+                ],
+              },
             ],
           },
         ],

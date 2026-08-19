@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { apiGet, apiPost, apiPatch, apiDelete } from '@/lib/apiClient'
-import type { Application, Elective, UserDocument } from '@/lib/types'
+import { apiDelete, apiFormPost, apiGet, apiPatch, apiPost } from '@/lib/apiClient'
+import type { Application, Elective, Payment, UserDocument } from '@/lib/types'
 
 export interface ElectiveFilters {
   search?: string
@@ -35,6 +35,7 @@ export const queryKeys = {
   applications: ['applications'] as const,
   documents: ['documents'] as const,
   onboarding: ['onboarding'] as const,
+  payments: ['payments'] as const,
 }
 
 export function useElectives(filters: ElectiveFilters = {}) {
@@ -68,6 +69,21 @@ export function useApplications() {
   })
 }
 
+export function usePayments() {
+  return useQuery({
+    queryKey: queryKeys.payments,
+    queryFn: () => apiGet<Payment[]>(`/payments`),
+  })
+}
+
+export function usePaymentReceipt(paymentId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['payments', paymentId, 'receipt'],
+    queryFn: () => apiGet<Payment>(`/payments/${paymentId}/receipt`),
+    enabled: Boolean(paymentId) && enabled,
+  })
+}
+
 export function useSubmitApplication() {
   const qc = useQueryClient()
   return useMutation({
@@ -98,12 +114,14 @@ export function useDocuments() {
     queryFn: () => apiGet<UserDocument[]>('/documents'),
   })
 }
-
 export function useUploadDocument() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, file }: { id: string; file: File }) =>
-      apiPost<{ status: string }>(`/documents/${id}`, { fileName: file.name }),
+    mutationFn: ({ id, file }: { id: string; file: File }) => {
+      const formData = new FormData()
+      formData.append('file', file)
+      return apiFormPost<{ status: string }>(`/documents/${id}`, formData)
+    },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: queryKeys.documents })
       void qc.invalidateQueries({ queryKey: ['admin', 'students'] })

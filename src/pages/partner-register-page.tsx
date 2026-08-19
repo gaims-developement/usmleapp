@@ -103,9 +103,9 @@ export function PartnerRegisterPage() {
   const [role, setRole] = useState<PartnerType | null>(null)
 
   return (
-    <section className="flex min-h-screen items-center bg-gradient-to-b from-ink-900 via-ink-900 to-ink-950 px-4 py-24">
-      <Container className="max-w-2xl">
-        <div className="mb-8 text-center">
+    <section className="flex min-h-screen items-center bg-gradient-to-b from-ink-900 via-ink-900 to-ink-950 px-4 py-24 md:min-h-0 md:items-start md:py-10">
+      <Container className="max-w-2xl md:max-w-5xl">
+        <div className="mb-8 text-center md:mb-4">
           <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-brand-600 text-white shadow-glow">
             <ShieldCheck className="size-6" aria-hidden />
           </span>
@@ -117,7 +117,7 @@ export function PartnerRegisterPage() {
         </div>
 
         {!role ? (
-          <div className="rounded-3xl border border-ink-700 bg-ink-900/60 p-8 shadow-lift backdrop-blur">
+          <div className="rounded-3xl border border-ink-700 bg-ink-900/60 p-8 shadow-lift backdrop-blur md:p-8">
             <p className="text-xs font-bold uppercase tracking-wider text-ink-400">
               Choose your account type
             </p>
@@ -255,7 +255,7 @@ function HospitalForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="rounded-3xl border border-ink-700 bg-ink-900/60 p-8 shadow-lift backdrop-blur"
+      className="rounded-3xl border border-ink-700 bg-ink-900/60 p-8 shadow-lift backdrop-blur md:p-8"
     >
       <FormHeader
         icon={<Building2 className="size-5" aria-hidden />}
@@ -436,7 +436,7 @@ function DoctorForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="rounded-3xl border border-ink-700 bg-ink-900/60 p-8 shadow-lift backdrop-blur"
+      className="rounded-3xl border border-ink-700 bg-ink-900/60 p-8 shadow-lift backdrop-blur md:p-8"
     >
       <FormHeader
         icon={<Stethoscope className="size-5" aria-hidden />}
@@ -507,7 +507,7 @@ function DoctorForm({
                     update('hospitalCode', e.target.value.toUpperCase())
                     setLookup(null)
                   }}
-                  placeholder="IMGH-1001"
+                  placeholder="HOSP-7K4P92"
                   className="pl-10 font-mono uppercase"
                   disabled={Boolean(lookup?.valid)}
                 />
@@ -609,7 +609,7 @@ function ReviewerForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="rounded-3xl border border-ink-700 bg-ink-900/60 p-8 shadow-lift backdrop-blur"
+      className="rounded-3xl border border-ink-700 bg-ink-900/60 p-8 shadow-lift backdrop-blur md:p-8"
     >
       <FormHeader
         icon={<ClipboardCheck className="size-5" aria-hidden />}

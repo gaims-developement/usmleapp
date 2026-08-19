@@ -5,6 +5,7 @@ export type AnnouncementStatus = 'published' | 'draft' | 'scheduled'
 export interface Announcement {
   id: string
   title: string
+  body: string
   audience: string
   status: AnnouncementStatus
   author: string
@@ -13,14 +14,14 @@ export interface Announcement {
 }
 
 export const adminAnnouncements: Announcement[] = [
-  { id: 'ann-1', title: 'Winter rotation windows now open', audience: 'All students', status: 'published', author: 'Alex Admin', publishedAt: '2026-08-05', views: 1842 },
-  { id: 'ann-2', title: 'New partnership with Mayo Clinic', audience: 'All students', status: 'published', author: 'Super Administrator', publishedAt: '2026-08-01', views: 3210 },
-  { id: 'ann-3', title: 'Document verification holiday schedule', audience: 'Reviewers', status: 'published', author: 'Rita Reviewer', publishedAt: '2026-07-28', views: 410 },
-  { id: 'ann-4', title: 'Updated fee structure effective Sep 1', audience: 'Hospitals & students', status: 'scheduled', author: 'Alex Admin', publishedAt: '2026-08-12', views: 0 },
-  { id: 'ann-5', title: 'Platform maintenance window', audience: 'All users', status: 'scheduled', author: 'Super Administrator', publishedAt: '2026-08-15', views: 0 },
-  { id: 'ann-6', title: 'Introducing the LoR referral program', audience: 'All students', status: 'draft', author: 'Jordan Lee', publishedAt: '—', views: 0 },
-  { id: 'ann-7', title: 'Reviewer onboarding webinar', audience: 'Reviewers', status: 'published', author: 'Rita Reviewer', publishedAt: '2026-07-20', views: 288 },
-  { id: 'ann-8', title: 'Step 2 CK preparation resources', audience: 'All students', status: 'draft', author: 'Alex Admin', publishedAt: '—', views: 0 },
+  { id: 'ann-1', title: 'Winter rotation windows now open', body: 'Applications for the winter rotation cycle are now open.', audience: 'All students', status: 'published', author: 'Alex Admin', publishedAt: '2026-08-05', views: 1842 },
+  { id: 'ann-2', title: 'New partnership with Mayo Clinic', body: 'We are excited to announce a new partnership with Mayo Clinic.', audience: 'All students', status: 'published', author: 'Super Administrator', publishedAt: '2026-08-01', views: 3210 },
+  { id: 'ann-3', title: 'Document verification holiday schedule', body: 'Please note the adjusted schedule for document verification during the holidays.', audience: 'Reviewers', status: 'published', author: 'Rita Reviewer', publishedAt: '2026-07-28', views: 410 },
+  { id: 'ann-4', title: 'Updated fee structure effective Sep 1', body: 'The fee structure for rotations will be updated effective September 1.', audience: 'Hospitals & students', status: 'scheduled', author: 'Alex Admin', publishedAt: '2026-08-12', views: 0 },
+  { id: 'ann-5', title: 'Platform maintenance window', body: 'Scheduled maintenance will occur on August 15.', audience: 'All users', status: 'scheduled', author: 'Super Administrator', publishedAt: '2026-08-15', views: 0 },
+  { id: 'ann-6', title: 'Introducing the LoR referral program', body: 'We are launching a new Letter of Recommendation referral program.', audience: 'All students', status: 'draft', author: 'Jordan Lee', publishedAt: '—', views: 0 },
+  { id: 'ann-7', title: 'Reviewer onboarding webinar', body: 'Join us for a reviewer onboarding webinar.', audience: 'Reviewers', status: 'published', author: 'Rita Reviewer', publishedAt: '2026-07-20', views: 288 },
+  { id: 'ann-8', title: 'Step 2 CK preparation resources', body: 'Check out the new Step 2 CK preparation resources.', audience: 'All students', status: 'draft', author: 'Alex Admin', publishedAt: '—', views: 0 },
 ]
 
 export type CmsStatus = 'published' | 'draft'

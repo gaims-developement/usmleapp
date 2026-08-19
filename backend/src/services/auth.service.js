@@ -1,3 +1,4 @@
+import crypto from 'node:crypto'
 import { prisma } from '../db/prisma.js'
 import { AppError } from '../utils/app-error.js'
 import { comparePassword, hashPassword } from './password.service.js'
@@ -8,6 +9,7 @@ import {
   signAccessToken,
 } from './token.service.js'
 import { env } from '../config/env.js'
+import { logger } from '../utils/logger.js'
 
 const REFRESH_TOKEN_TTL_MS = durationToMs(env.JWT_REFRESH_EXPIRES_IN)
 const EMAIL_VERIFICATION_TTL_MS = durationToMs(env.EMAIL_VERIFICATION_EXPIRES_IN)
@@ -19,8 +21,28 @@ export const userInclude = {
     include: { interests: true, locations: true, goals: true },
   },
   hospitalProfile: true,
-  doctorProfile: true,
-  reviewerProfile: true,
+  doctorProfile: {
+    include: {
+      hospital: true,
+      department: true,
+    },
+  },
+  reviewerProfile: {
+    include: {
+      hospital: true,
+    },
+  },
+}
+
+const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+
+export function generateCode(prefix, length = 6) {
+  const bytes = crypto.randomBytes(length)
+  let suffix = ''
+  for (let i = 0; i < length; i++) {
+    suffix += CODE_ALPHABET[bytes[i] % CODE_ALPHABET.length]
+  }
+  return `${prefix}-${suffix}`
 }
 
 const toDateOnly = value => (value ? new Date(value).toISOString().slice(0, 10) : undefined)
@@ -52,10 +74,13 @@ export function serializeUser(user) {
     travelReady: student?.travelReady ?? undefined,
     hospital: hospital
       ? {
+          id: hospital.id,
           name: hospital.name ?? null,
           city: hospital.city ?? null,
           state: hospital.state ?? null,
           country: hospital.country ?? null,
+          address: hospital.address ?? null,
+          website: hospital.website ?? null,
           email: hospital.email ?? null,
           phone: hospital.phone ?? null,
           description: hospital.description ?? null,
@@ -68,18 +93,33 @@ export function serializeUser(user) {
       : undefined,
     doctor: doctor
       ? {
+          id: doctor.id,
           specialty: doctor.specialty ?? null,
+          title: doctor.title ?? null,
+          licenseNumber: doctor.licenseNumber ?? null,
           email: doctor.email ?? null,
           phone: doctor.phone ?? null,
           availability: doctor.availability ?? null,
           status: doctor.status ?? null,
+          hospitalId: doctor.hospitalId ?? null,
+          hospitalName: doctor.hospital?.name ?? null,
+          departmentId: doctor.departmentId ?? null,
+          departmentName: doctor.department?.name ?? null,
         }
       : undefined,
     reviewer: reviewer
       ? {
+          id: reviewer.id,
           specialty: reviewer.specialty ?? null,
           department: reviewer.department ?? null,
           timezone: reviewer.timezone ?? null,
+          title: reviewer.title ?? null,
+          institution: reviewer.institution ?? null,
+          phone: reviewer.phone ?? null,
+          yearsOfExperience: reviewer.yearsOfExperience ?? null,
+          status: reviewer.status ?? null,
+          hospitalId: reviewer.hospitalId ?? null,
+          hospitalName: reviewer.hospital?.name ?? null,
         }
       : undefined,
     createdAt: user.createdAt.toISOString(),
@@ -313,6 +353,386 @@ async function registerPartner(input) {
   }
 }
 
+async function resolveActiveHospitalCode(code) {
+  const record = await prisma.hospitalRegistrationCode.findUnique({
+    where: { code: String(code).toUpperCase().trim() },
+    include: { hospital: true },
+  })
+  if (!record) {
+    throw new AppError(
+      'Hospital code not found. Please check the code provided by your hospital.',
+      404,
+      'INVALID_HOSPITAL_CODE',
+    )
+  }
+  if (!record.isActive) {
+    throw new AppError(
+      'This hospital code is no longer active. Please contact your hospital administrator.',
+      400,
+      'HOSPITAL_CODE_INACTIVE',
+    )
+  }
+  if (record.expiresAt && record.expiresAt < new Date()) {
+    throw new AppError(
+      'This hospital code has expired. Please contact your hospital administrator.',
+      400,
+      'HOSPITAL_CODE_EXPIRED',
+    )
+  }
+  return record
+}
+
+async function resolveHospitalCode(code) {
+  const record = await prisma.hospitalRegistrationCode.findUnique({
+    where: { code: String(code).toUpperCase().trim() },
+    include: { hospital: true },
+  })
+  if (!record) {
+    throw new AppError(
+      'Hospital code not found. Please check the code provided by your hospital.',
+      404,
+      'INVALID_HOSPITAL_CODE',
+    )
+  }
+  return record
+}
+
+async function registerHospital(input, meta = {}) {
+  const email = input.email.toLowerCase()
+
+  const existing = await prisma.user.findUnique({ where: { email } })
+  if (existing) {
+    throw new AppError('A user with this email already exists', 409, 'EMAIL_EXISTS')
+  }
+
+  const role = await prisma.role.findUnique({ where: { name: 'HOSPITAL' } })
+  if (!role) {
+    throw new AppError('Hospital role is not configured', 500, 'ROLE_NOT_FOUND')
+  }
+
+  const passwordHash = await hashPassword(input.password)
+
+  let createdUser
+  let hospitalCode
+  await prisma.$transaction(async tx => {
+    createdUser = await tx.user.create({
+      data: {
+        name: input.name,
+        email,
+        passwordHash,
+        roleId: role.id,
+        onboarded: true,
+        isDemo: false,
+        hospitalProfile: {
+          create: {
+            name: input.organizationName ?? input.name,
+            city: input.city ?? null,
+            state: input.state ?? null,
+            country: input.country ?? null,
+            address: input.address ?? null,
+            website: input.website ?? null,
+            email,
+            phone: input.phone ?? null,
+            description: input.description ?? null,
+            coordinatorName: input.coordinatorName ?? null,
+            coordinatorEmail: input.coordinatorEmail ?? null,
+            coordinatorPhone: input.coordinatorPhone ?? null,
+            status: 'pending',
+          },
+        },
+      },
+      include: userInclude,
+    })
+
+    hospitalCode = generateCode('HOSP')
+    await tx.hospitalRegistrationCode.create({
+      data: {
+        hospitalId: createdUser.hospitalProfile.id,
+        code: hospitalCode,
+        isActive: false,
+      },
+    })
+
+    await tx.partnerRegistration.create({
+      data: {
+        registeredById: createdUser.id,
+        hospitalProfileId: createdUser.hospitalProfile.id,
+        organizationName: input.organizationName ?? input.name,
+        contactName: input.name,
+        contactEmail: email,
+        phone: input.phone ?? null,
+        city: input.city ?? null,
+        state: input.state ?? null,
+        country: input.country ?? null,
+        message: input.description ?? null,
+        status: 'PENDING',
+        submittedAt: new Date(),
+      },
+    })
+  })
+
+  notifySuperAdmins(
+    'New Hospital Registration',
+    `A new hospital "${input.organizationName ?? input.name}" has registered and is pending review.`,
+  ).catch(() => {})
+
+  return {
+    user: serializeUser(createdUser),
+    status: 'PENDING',
+    message: 'Hospital registration submitted for review. You will be able to log in once approved.',
+  }
+}
+
+async function notifySuperAdmins(title, body) {
+  const superAdminRole = await prisma.role.findUnique({ where: { name: 'SUPER_ADMIN' } })
+  if (!superAdminRole) return
+  const superAdmins = await prisma.user.findMany({
+    where: { roleId: superAdminRole.id, deletedAt: null },
+    select: { id: true },
+  })
+  for (const sa of superAdmins) {
+    await prisma.notification.create({
+      data: { userId: sa.id, tone: 'INFO', title, body },
+    })
+  }
+}
+
+async function registerDoctor(input, meta = {}) {
+  const email = input.email.toLowerCase()
+
+  const existing = await prisma.user.findUnique({ where: { email } })
+  if (existing) {
+    throw new AppError('A user with this email already exists', 409, 'EMAIL_EXISTS')
+  }
+
+  const hospitalCodeRecord = await resolveHospitalCode(input.hospitalCode)
+
+  const role = await prisma.role.findUnique({ where: { name: 'DOCTOR' } })
+  if (!role) {
+    throw new AppError('Doctor role is not configured', 500, 'ROLE_NOT_FOUND')
+  }
+
+  let departmentId = null
+  if (input.departmentName) {
+    const department = await prisma.department.upsert({
+      where: {
+        hospitalId_name: {
+          hospitalId: hospitalCodeRecord.hospitalId,
+          name: input.departmentName.trim(),
+        },
+      },
+      update: {},
+      create: {
+        hospitalId: hospitalCodeRecord.hospitalId,
+        name: input.departmentName.trim(),
+      },
+    })
+    departmentId = department.id
+  }
+
+  const passwordHash = await hashPassword(input.password)
+
+  let user
+  try {
+    user = await prisma.user.create({
+      data: {
+        name: input.name,
+        email,
+        passwordHash,
+        roleId: role.id,
+        onboarded: true,
+        isDemo: false,
+        doctorProfile: {
+          create: {
+            hospitalId: hospitalCodeRecord.hospitalId,
+            departmentId,
+            specialty: input.specialty ?? null,
+            title: input.title ?? null,
+            licenseNumber: input.licenseNumber ?? null,
+            email,
+            phone: input.phone ?? null,
+            availability: input.availability ?? null,
+            status: 'pending',
+          },
+        },
+      },
+      include: userInclude,
+    })
+  } catch (err) {
+    logger.error('Doctor registration failed:', {
+      name: err?.name,
+      code: err?.code,
+      message: err?.message,
+    })
+    throw new AppError(
+      'Unable to create doctor account. Please verify the hospital information and try again.',
+      400,
+      'DOCTOR_CREATE_FAILED',
+    )
+  }
+
+  await prisma.hospitalRegistrationCode.update({
+    where: { id: hospitalCodeRecord.id },
+    data: { usedCount: { increment: 1 } },
+  })
+
+  await prisma.partnerRegistration.create({
+    data: {
+      registeredById: user.id,
+      organizationName: user.name,
+      contactName: user.name,
+      contactEmail: email,
+      phone: input.phone ?? null,
+      country: null,
+      message: null,
+      status: 'PENDING',
+      submittedAt: new Date(),
+    },
+  })
+
+  const hospitalOwner = await prisma.hospitalProfile.findUnique({
+    where: { id: hospitalCodeRecord.hospitalId },
+    select: { userId: true },
+  })
+  if (hospitalOwner?.userId) {
+    await prisma.notification.create({
+      data: {
+        userId: hospitalOwner.userId,
+        tone: 'INFO',
+        title: 'New Doctor Registration',
+        body: `A new doctor "${input.name}" has registered and is pending your approval.`,
+      },
+    })
+  }
+
+  return {
+    user: serializeUser(user),
+    status: 'PENDING',
+    message: 'Doctor registration submitted. Your account is pending hospital approval.',
+  }
+}
+
+async function registerReviewer(input, meta = {}) {
+  const email = input.email.toLowerCase()
+
+  const existing = await prisma.user.findUnique({ where: { email } })
+  if (existing) {
+    throw new AppError('A user with this email already exists', 409, 'EMAIL_EXISTS')
+  }
+
+  const codeToResolve = input.hospitalCode || input.invitationCode
+  if (!codeToResolve) {
+    throw new AppError('Hospital code is required', 400, 'HOSPITAL_CODE_REQUIRED')
+  }
+
+  const hospitalCodeRecord = await resolveHospitalCode(codeToResolve)
+
+  const role = await prisma.role.findUnique({ where: { name: 'REVIEWER' } })
+  if (!role) {
+    throw new AppError('Reviewer role is not configured', 500, 'ROLE_NOT_FOUND')
+  }
+
+  const passwordHash = await hashPassword(input.password)
+
+  let user
+  try {
+    user = await prisma.user.create({
+      data: {
+        name: input.name,
+        email,
+        passwordHash,
+        roleId: role.id,
+        onboarded: true,
+        isDemo: false,
+        reviewerProfile: {
+          create: {
+            hospitalId: hospitalCodeRecord.hospitalId,
+            specialty: input.specialty ?? null,
+            department: input.department ?? null,
+            timezone: input.timezone ?? null,
+            title: input.title ?? null,
+            institution: input.institution ?? null,
+            phone: input.phone ?? null,
+            yearsOfExperience: input.yearsOfExperience ?? null,
+            status: 'pending',
+          },
+        },
+      },
+      include: userInclude,
+    })
+  } catch (err) {
+    logger.error('Reviewer registration failed:', {
+      name: err?.name,
+      code: err?.code,
+      message: err?.message,
+    })
+    throw new AppError(
+      'Unable to create reviewer account. Please verify the hospital information and try again.',
+      400,
+      'REVIEWER_CREATE_FAILED',
+    )
+  }
+
+  await prisma.hospitalRegistrationCode.update({
+    where: { id: hospitalCodeRecord.id },
+    data: { usedCount: { increment: 1 } },
+  })
+
+  await prisma.partnerRegistration.create({
+    data: {
+      registeredById: user.id,
+      organizationName: user.name,
+      contactName: user.name,
+      contactEmail: email,
+      phone: input.phone ?? null,
+      country: null,
+      message: null,
+      status: 'PENDING',
+      submittedAt: new Date(),
+    },
+  })
+
+  const hospitalOwner = await prisma.hospitalProfile.findUnique({
+    where: { id: hospitalCodeRecord.hospitalId },
+    select: { userId: true },
+  })
+  if (hospitalOwner?.userId) {
+    await prisma.notification.create({
+      data: {
+        userId: hospitalOwner.userId,
+        tone: 'INFO',
+        title: 'New Reviewer Registration',
+        body: `A new reviewer "${input.name}" has registered and is pending your approval.`,
+      },
+    })
+  }
+
+  return {
+    user: serializeUser(user),
+    status: 'PENDING',
+    message: 'Reviewer registration submitted. Your account is pending hospital approval.',
+  }
+}
+
+async function lookupHospitalCode(code) {
+  const record = await resolveActiveHospitalCode(code)
+  const departments = await prisma.department.findMany({
+    where: { hospitalId: record.hospitalId },
+    select: { id: true, name: true },
+    orderBy: { name: 'asc' },
+  })
+  return {
+    valid: true,
+    code: record.code,
+    hospitalId: record.hospitalId,
+    hospitalName: record.hospital.name ?? 'Hospital',
+    city: record.hospital.city ?? '',
+    state: record.hospital.state ?? '',
+    country: record.hospital.country ?? '',
+    departments: departments.map(d => d.name),
+  }
+}
+
 async function refresh(refreshToken, meta = {}) {
   const record = await prisma.refreshToken.findUnique({
     where: { tokenHash: hashToken(refreshToken) },
@@ -506,6 +926,10 @@ export const authService = {
   login,
   registerStudent,
   registerPartner,
+  registerHospital,
+  registerDoctor,
+  registerReviewer,
+  lookupHospitalCode,
   refresh,
   logout,
   requestEmailVerification,

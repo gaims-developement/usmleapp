@@ -1,11 +1,11 @@
-import { apiGet, apiPatch } from '@/lib/apiClient'
-import { hospitalDoctors, type HospitalDoctor } from '@/mocks/hospital/doctors'
-import { hospitalPrograms, type HospitalProgram } from '@/mocks/hospital/programs'
-import { hospitalStudents, type HospitalStudent } from '@/mocks/hospital/students'
-import { hospitalProfile, type HospitalProfile } from '@/mocks/hospital/profile'
-import { hospitalNotifications, type HospitalNotification } from '@/mocks/hospital/notifications'
-import { hospitalAnnouncements, type HospitalAnnouncement } from '@/mocks/hospital/announcements'
-import { hospitalCalendarEvents, type HospitalCalendarEvent } from '@/mocks/hospital/calendar'
+import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/apiClient'
+import type { HospitalDoctor } from '@/mocks/hospital/doctors'
+import type { HospitalProgram } from '@/mocks/hospital/programs'
+import type { HospitalStudent } from '@/mocks/hospital/students'
+import type { HospitalProfile } from '@/mocks/hospital/profile'
+import type { HospitalNotification } from '@/mocks/hospital/notifications'
+import type { HospitalAnnouncement } from '@/mocks/hospital/announcements'
+import type { HospitalCalendarEvent } from '@/mocks/hospital/calendar'
 
 export type HospitalDecision = 'awaiting_decision' | 'accepted' | 'rejected' | 'waitlisted' | 'scheduled' | 'completed'
 
@@ -76,45 +76,52 @@ export interface HospitalApplicationJoined extends HospitalApplicationCore {
   rotationEnd?: string
 }
 
-let programs: HospitalProgram[] = [...hospitalPrograms]
-let announcements: HospitalAnnouncement[] = [...hospitalAnnouncements]
-let notifications: HospitalNotification[] = [...hospitalNotifications]
-let doctors: HospitalDoctor[] = [...hospitalDoctors]
-
-const studentOf = (id: string): HospitalStudent => {
-  const match = hospitalStudents.find(s => s.id === id)
-  if (match) return match
-  return {
-    id,
-    name: 'Student',
-    country: 'United States',
-    medicalSchool: 'Medical University',
-    graduationYear: 2027,
-  }
+export interface HospitalRegistrationCodeRecord {
+  code: string
+  isActive: boolean
+  usedCount: number
+  expiresAt: string | null
+  createdAt: string
 }
 
-const programOf = (id: string) => programs.find(p => p.id === id)
-const doctorOf = (id?: string) => (id ? doctors.find(d => d.id === id) : undefined)
+export interface OrganizationDepartment {
+  id: string
+  name: string
+  doctorCount: number
+  createdAt: string
+}
 
-function joined(a: HospitalApplicationCore): HospitalApplicationJoined {
-  return {
-    ...a,
-    reviewedBy: a.reviewedBy ?? 'Dr. Nia Johnson',
-    usmleProgress: a.usmleProgress ?? 'Step 1 passed (252)',
-    clinicalExperience: a.clinicalExperience ?? '6 weeks — Internal Medicine clerkship',
-    researchExperience: a.researchExperience ?? 'Case report',
-    languages: a.languages ?? ['English', 'Hindi'],
-    rotationStart: a.rotationStart,
-    rotationEnd: a.rotationEnd,
-    student: studentOf(a.studentId),
-    program: (() => {
-      const p = programOf(a.programId)
-      return p
-        ? { id: p.id, name: p.name, department: p.department, specialty: p.specialty, duration: p.duration, fee: p.fee }
-        : { id: a.programId, name: 'Rotation Program', department: 'Medicine', specialty: 'General', duration: '4 weeks', fee: 1000 }
-    })(),
-    doctor: doctorOf(a.doctorId),
+export interface HospitalOrganization {
+  profile: {
+    id: string
+    name: string | null
+    city: string | null
+    state: string | null
+    country: string | null
+    address: string | null
+    website: string | null
+    email: string | null
+    phone: string | null
+    description: string | null
+    coordinatorName: string | null
+    coordinatorEmail: string | null
+    coordinatorPhone: string | null
+    tier: string | null
+    status: string | null
   }
+  activeCode: HospitalRegistrationCodeRecord | null
+  departments: OrganizationDepartment[]
+  doctors: {
+    id: string
+    userId: string
+    name: string
+    email: string
+    specialty: string | null
+    title: string | null
+    departmentId: string | null
+    departmentName: string | null
+    status: string | null
+  }[]
 }
 
 const STATUS_RANK: Record<string, number> = {
@@ -127,8 +134,8 @@ const STATUS_RANK: Record<string, number> = {
 }
 
 export async function fetchHospitalApplications(): Promise<HospitalApplicationJoined[]> {
-  const res = await apiGet<HospitalApplicationCore[]>('/applications')
-  return res.map(joined).sort((a, b) => {
+  const res = await apiGet<HospitalApplicationJoined[]>('/hospitals/me/applications')
+  return res.sort((a, b) => {
     const rA = STATUS_RANK[a.status] ?? 0
     const rB = STATUS_RANK[b.status] ?? 0
     if (rA !== rB) return rA - rB
@@ -137,20 +144,20 @@ export async function fetchHospitalApplications(): Promise<HospitalApplicationJo
 }
 
 export async function fetchHospitalApplication(applicationId: string): Promise<HospitalApplicationJoined> {
-  const res = await apiGet<HospitalApplicationCore[]>('/applications')
-  const app = res.find(a => a.id === applicationId)
-  if (!app) throw new Error(`Application ${applicationId} not found`)
-  return joined(app)
+  return apiGet<HospitalApplicationJoined>(`/hospitals/me/applications/${applicationId}`)
 }
 
 export async function fetchHospitalPrograms(): Promise<HospitalProgram[]> {
-  return programs
+  return apiGet<HospitalProgram[]>('/hospitals/me/programs')
 }
 
 export async function fetchHospitalProgram(programId: string): Promise<HospitalProgram> {
-  const p = programs.find(pr => pr.id === programId)
-  if (!p) throw new Error(`Program ${programId} not found`)
-  return p
+  if (!programId) throw new Error('Program id is required')
+  const program = await apiGet<HospitalProgram>(`/hospitals/me/programs/${programId}`)
+  if (Array.isArray(program)) {
+    throw new Error('Expected a single program, received a list')
+  }
+  return program
 }
 
 export async function decideApplication(
@@ -158,104 +165,78 @@ export async function decideApplication(
   decision: string,
   decisionNote?: string,
 ): Promise<HospitalApplicationJoined> {
-  const res = await apiPatch<HospitalApplicationCore>(`/applications/${applicationId}/decide`, {
+  return apiPatch<HospitalApplicationJoined>(`/hospitals/me/applications/${applicationId}/decide`, {
     decision,
     decisionNote,
   })
-  return joined(res)
 }
 
 export async function assignDoctor(applicationId: string, doctorId: string): Promise<HospitalApplicationJoined> {
-  const res = await apiPatch<HospitalApplicationCore>(`/applications/${applicationId}/decide`, {
+  return apiPatch<HospitalApplicationJoined>(`/hospitals/me/applications/${applicationId}/schedule`, {
     doctorId,
   })
-  return joined(res)
 }
 
 export async function fetchHospitalProfile(): Promise<HospitalProfile> {
-  return hospitalProfile
+  return apiGet<HospitalProfile>('/hospitals/me')
+}
+
+export async function fetchHospitalOrganization(): Promise<HospitalOrganization> {
+  return apiGet<HospitalOrganization>('/hospitals/me/organization')
+}
+
+export async function createHospitalDepartment(name: string): Promise<OrganizationDepartment> {
+  return apiPost<OrganizationDepartment>('/hospitals/me/departments', { name })
+}
+
+export async function deleteHospitalDepartment(
+  id: string,
+): Promise<{ deleted: boolean; id: string }> {
+  return apiDelete<{ deleted: boolean; id: string }>(`/hospitals/me/departments/${id}`)
+}
+
+export async function regenerateHospitalCode(): Promise<HospitalRegistrationCodeRecord> {
+  return apiPost<HospitalRegistrationCodeRecord>('/hospitals/me/code/regenerate')
 }
 
 export async function fetchHospitalNotifications(): Promise<HospitalNotification[]> {
-  return notifications
+  const data = await apiGet<BackendNotification[]>('/notifications')
+  return data.map(mapNotification)
 }
 
 export async function fetchHospitalAnnouncements(): Promise<HospitalAnnouncement[]> {
-  return announcements
+  return apiGet<HospitalAnnouncement[]>('/hospitals/me/announcements')
 }
 
 export async function fetchHospitalCalendarEvents(): Promise<HospitalCalendarEvent[]> {
-  return hospitalCalendarEvents
+  return apiGet<HospitalCalendarEvent[]>('/hospitals/me/calendar-events')
 }
 
 export async function fetchHospitalStudents(): Promise<HospitalStudent[]> {
-  return hospitalStudents
+  return apiGet<HospitalStudent[]>('/hospitals/me/students')
 }
 
 export async function fetchHospitalDoctors(): Promise<HospitalDoctor[]> {
-  return doctors
+  return apiGet<HospitalDoctor[]>('/hospitals/me/doctors')
 }
 
 export async function createHospitalDoctor(input: HospitalDoctorInput): Promise<HospitalDoctor> {
-  const record: HospitalDoctor = {
-    id: `doc-${Date.now()}`,
-    name: input.name,
-    specialty: input.specialty,
-    department: input.department ?? 'Internal Medicine',
-    email: input.email ?? 'doctor@stmarys.org',
-    phone: input.phone ?? '+1 (415) 668-1000',
-    availability: input.availability ?? 'High',
-    status: 'active',
-    studentsAssigned: 0,
-    currentRotations: 0,
-    joinedAt: new Date().toISOString().slice(0, 10),
-  }
-  doctors.push(record)
-  return record
+  return apiPost<HospitalDoctor>('/hospitals/me/doctors', input)
 }
 
 export async function createHospitalProgram(input: HospitalProgramInput): Promise<HospitalProgram> {
-  const record: HospitalProgram = {
-    id: `PRG-${Date.now()}`,
-    name: input.name,
-    specialty: input.specialty,
-    department: input.department,
-    duration: input.duration,
-    fee: input.fee,
-    status: input.status,
-    seats: input.seats ?? 5,
-    filled: 0,
-    deadline: input.deadline ?? new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
-    description: input.description ?? '',
-    eligibility: input.eligibility ?? '',
-    requiredDocuments: [],
-    availableDates: [],
-    faculty: [],
-    createdAt: new Date().toISOString().slice(0, 10),
-  }
-  programs.push(record)
-  return record
+  return apiPost<HospitalProgram>('/hospitals/me/programs', input)
 }
 
 export async function updateHospitalProgram(
   programId: string,
   patch: Partial<HospitalProgramInput>,
 ): Promise<HospitalProgram> {
-  const idx = programs.findIndex(p => p.id === programId)
-  if (idx !== -1) {
-    programs[idx] = { ...programs[idx], ...patch } as HospitalProgram
-    return programs[idx]
-  }
-  throw new Error('Program not found')
+  return apiPatch<HospitalProgram>(`/hospitals/me/programs/${programId}`, patch)
 }
 
 export async function setProgramStatus(programId: string, status: any): Promise<HospitalProgram> {
-  const idx = programs.findIndex(p => p.id === programId)
-  if (idx !== -1) {
-    programs[idx].status = status
-    return programs[idx]
-  }
-  throw new Error('Program not found')
+  return apiPatch<HospitalProgram>(`/hospitals/me/programs/${programId}/status`, { status })
 }
 
 export async function scheduleApplication(
@@ -264,58 +245,100 @@ export async function scheduleApplication(
   start: string,
   end: string,
 ): Promise<HospitalApplicationJoined> {
-  const res = await apiPatch<HospitalApplicationCore>(`/applications/${applicationId}/decide`, {
-    decision: 'scheduled',
+  return apiPatch<HospitalApplicationJoined>(`/hospitals/me/applications/${applicationId}/schedule`, {
     doctorId,
-    rotationStart: start,
-    rotationEnd: end,
+    start,
+    end,
   })
-  return joined(res)
 }
 
 export async function updateInternalNotes(
   applicationId: string,
   notes: string,
 ): Promise<HospitalApplicationJoined> {
-  const res = await apiPatch<HospitalApplicationCore>(`/applications/${applicationId}/decide`, {
-    internalNotes: notes,
+  return apiPatch<HospitalApplicationJoined>(`/hospitals/me/applications/${applicationId}/notes`, {
+    notes,
   })
-  return joined(res)
 }
 
 export async function createHospitalAnnouncement(
   input: HospitalAnnouncementInput,
 ): Promise<HospitalAnnouncement> {
-  const record: HospitalAnnouncement = {
-    id: `ann-${Date.now()}`,
-    title: input.title,
-    body: input.body,
-    status: input.status,
-    audience: input.audience ?? 'All Students',
-    author: 'Alex Admin',
-    publishedAt: new Date().toISOString().slice(0, 10),
-  }
-  announcements.push(record)
-  return record
+  return apiPost<HospitalAnnouncement>('/hospitals/me/announcements', input)
 }
 
 export async function updateHospitalAnnouncement(
   announcementId: string,
   patch: Partial<HospitalAnnouncementInput>,
 ): Promise<HospitalAnnouncement> {
-  const idx = announcements.findIndex(a => a.id === announcementId)
-  if (idx !== -1) {
-    announcements[idx] = { ...announcements[idx], ...patch } as HospitalAnnouncement
-    return announcements[idx]
-  }
-  throw new Error('Announcement not found')
+  return apiPatch<HospitalAnnouncement>(`/hospitals/me/announcements/${announcementId}`, patch)
 }
 
 export async function deleteHospitalAnnouncement(announcementId: string): Promise<void> {
-  announcements = announcements.filter(a => a.id !== announcementId)
+  await apiDelete<void>(`/hospitals/me/announcements/${announcementId}`)
 }
 
 export async function markAllHospitalNotificationsRead(): Promise<HospitalNotification[]> {
-  notifications = notifications.map(n => ({ ...n, read: true }))
-  return notifications
+  await apiPost<void>('/notifications/read-all')
+  return fetchHospitalNotifications()
+}
+
+export interface HospitalPendingMember {
+  id: string
+  userId: string
+  name: string
+  email: string
+  specialty?: string | null
+  registeredAt: string
+  status: string
+}
+
+export async function fetchPendingDoctors(): Promise<HospitalPendingMember[]> {
+  return apiGet<HospitalPendingMember[]>('/hospitals/me/pending-doctors')
+}
+
+export async function fetchPendingReviewers(): Promise<HospitalPendingMember[]> {
+  return apiGet<HospitalPendingMember[]>('/hospitals/me/pending-reviewers')
+}
+
+export async function approveMember(memberId: string, role: 'DOCTOR' | 'REVIEWER'): Promise<void> {
+  const slug = role === 'DOCTOR' ? 'doctors' : 'reviewers'
+  await apiPatch(`/hospitals/me/${slug}/${memberId}/approve`)
+}
+
+export async function rejectMember(memberId: string, role: 'DOCTOR' | 'REVIEWER', reason?: string): Promise<void> {
+  const slug = role === 'DOCTOR' ? 'doctors' : 'reviewers'
+  await apiPatch(`/hospitals/me/${slug}/${memberId}/reject`, { reason })
+}
+
+interface BackendNotification {
+  id: string
+  tone: string
+  title: string
+  body: string
+  read: boolean
+  applicationId?: string | null
+  time: string
+  createdAt?: string | null
+}
+
+function mapNotification(n: BackendNotification): HospitalNotification {
+  const type = n.applicationId
+    ? 'application'
+    : n.tone === 'success'
+      ? 'scheduled'
+      : n.tone === 'warning'
+        ? 'program'
+        : n.tone === 'info'
+          ? 'announcement'
+          : 'system'
+  return {
+    id: n.id,
+    type: type as HospitalNotification['type'],
+    title: n.title,
+    message: n.body,
+    time: n.time,
+    read: n.read,
+    createdAt: n.createdAt ?? null,
+  }
 }

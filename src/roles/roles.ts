@@ -49,6 +49,7 @@ export const ROLES: Record<RoleId, Role> = {
     description: 'Full platform control — users, roles, settings, payments, and content.',
     permissions: [...ALL_PERMISSIONS],
     manageableRoles: ['ADMIN', 'REVIEWER', 'HOSPITAL', 'DOCTOR', 'STUDENT'],
+    supersedes: ['ADMIN'],
   },
   ADMIN: {
     id: 'ADMIN',
@@ -56,6 +57,7 @@ export const ROLES: Record<RoleId, Role> = {
     description: 'Manages users, hospitals, doctors, reviewers, applications, and analytics.',
     permissions: ADMIN_PERMISSIONS,
     manageableRoles: ['REVIEWER', 'HOSPITAL', 'DOCTOR'],
+    supersedes: [],
   },
   REVIEWER: {
     id: 'REVIEWER',
@@ -63,6 +65,7 @@ export const ROLES: Record<RoleId, Role> = {
     description: 'Reviews assigned applications, verifies documents, and makes approval decisions.',
     permissions: REVIEWER_PERMISSIONS,
     manageableRoles: [],
+    supersedes: [],
   },
   HOSPITAL: {
     id: 'HOSPITAL',
@@ -70,6 +73,7 @@ export const ROLES: Record<RoleId, Role> = {
     description: 'Manages its profile and elective programs, accepts applications, and views assigned students.',
     permissions: HOSPITAL_PERMISSIONS,
     manageableRoles: [],
+    supersedes: [],
   },
   DOCTOR: {
     id: 'DOCTOR',
@@ -77,6 +81,7 @@ export const ROLES: Record<RoleId, Role> = {
     description: 'Views assigned students, submits evaluations, issues certificates, and recommends LoRs.',
     permissions: DOCTOR_PERMISSIONS,
     manageableRoles: [],
+    supersedes: [],
   },
   STUDENT: {
     id: 'STUDENT',
@@ -84,7 +89,22 @@ export const ROLES: Record<RoleId, Role> = {
     description: 'Browses electives, applies, uploads documents, and tracks applications.',
     permissions: STUDENT_PERMISSIONS,
     manageableRoles: [],
+    supersedes: [],
   },
+}
+
+/**
+ * Central role hierarchy. A role implicitly grants access to every role it
+ * supersedes (transitively). Kept explicit so both the frontend guards and
+ * backend middleware can share the same definition of "who outranks whom".
+ */
+export const ROLE_SUPERSEDES: Record<RoleId, RoleId[]> = {
+  SUPER_ADMIN: ['ADMIN'],
+  ADMIN: [],
+  REVIEWER: [],
+  HOSPITAL: [],
+  DOCTOR: [],
+  STUDENT: [],
 }
 
 export const ROLE_IDS: RoleId[] = [

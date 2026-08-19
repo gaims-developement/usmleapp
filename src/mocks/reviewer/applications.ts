@@ -29,10 +29,14 @@ export type ReviewerRecommendation = 'approve' | 'reject' | 'request_changes' | 
 export type ApplicationPriority = 'high' | 'normal' | 'low'
 
 export interface ReviewDocument {
+  id?: string
+  applicationDocumentId?: string
   name: ReviewDocType
   verification: DocVerification
   uploadedAt: string
   note: string
+  fileName?: string
+  mimeType?: string
 }
 
 export interface EligibilityCheck {

@@ -1,3 +1,4 @@
+import { apiGet, apiPatch } from '@/lib/apiClient'
 import { partnerHospitals, type PartnerHospital } from '@/mocks/partners/hospitals'
 import { partnerDoctors, type PartnerDoctor } from '@/mocks/partners/doctors'
 import { partnerReviewers, type PartnerReviewer } from '@/mocks/partners/reviewers'
@@ -87,14 +88,6 @@ function normalizeCode(code: string): string {
   return code.trim().toUpperCase()
 }
 
-function hospitalById(id: string): PartnerHospital | undefined {
-  return hospitals.find(h => h.id === id)
-}
-
-function doctorById(id: string): PartnerDoctor | undefined {
-  return doctors.find(d => d.id === id)
-}
-
 function assertEmailFree(email: string): void {
   const normalized = email.trim().toLowerCase()
   const inRegistries = [...hospitals, ...doctors, ...reviewers].some(
@@ -152,17 +145,17 @@ function requestFromDoctor(d: PartnerDoctor): ApprovalRequest {
     submittedAt: d.joinedAt,
     status: approvalStatus(d.status),
     hospitalCode: d.hospitalCode,
-    hospitalName: hospital?.name,
+    hospitalName: hospital?.name || d.hospitalCode,
     department: d.department,
     reviewMessage: d.reviewMessage,
     details: [
       { label: 'Specialty', value: d.specialty },
       { label: 'Department', value: d.department },
       { label: 'Designation', value: d.designation },
-      { label: 'License number', value: d.licenseNumber },
+      { label: 'License #', value: d.licenseNumber },
       { label: 'Experience', value: `${d.yearsExperience} years` },
-      { label: 'Hospital', value: hospital ? `${hospital.name} (${d.hospitalCode})` : d.hospitalCode },
-      { label: 'Phone', value: d.phone },
+      { label: 'Hospital Code', value: d.hospitalCode },
+      { label: 'Hospital Name', value: hospital?.name || '—' },
     ],
   }
 }
@@ -179,12 +172,11 @@ function requestFromReviewer(r: PartnerReviewer): ApprovalRequest {
     department: r.department,
     reviewMessage: r.reviewMessage,
     details: [
-      { label: 'Country', value: r.country },
       { label: 'Department', value: r.department },
       { label: 'Qualifications', value: r.qualifications },
       { label: 'Experience', value: `${r.experienceYears} years` },
-      { label: 'Reviewer ID', value: r.reviewerId || '—' },
-      { label: 'Phone', value: r.phone },
+      { label: 'Country', value: r.country },
+      { label: 'Assigned ID', value: r.reviewerId },
     ],
   }
 }
@@ -197,8 +189,32 @@ export interface HospitalCodeLookup {
 
 export const partnerService = {
   async listHospitals(): Promise<PartnerHospital[]> {
-    await latency()
-    return hospitals.map(h => ({ ...h, departments: [...h.departments], accreditation: [...h.accreditation] }))
+    try {
+      const res = await apiGet<any[]>('/users/hospitals')
+      return res.map(h => ({
+        id: h.id,
+        name: h.name,
+        hospitalCode: h.hospitalCode || 'HOSP-NONE',
+        email: h.email,
+        coordinator: { name: h.coordinatorName || h.name, email: h.email },
+        phone: h.phone || '',
+        country: h.country || 'United States',
+        city: h.city || '',
+        address: h.address || '',
+        website: h.website || '',
+        departments: [],
+        accreditation: [],
+        description: '',
+        logoColor: 'sky' as const,
+        activeElectives: h.programs || 0,
+        enrolledStudents: h.students || 0,
+        associatedDoctors: h.doctors || 0,
+        status: h.status || 'active',
+        joinedAt: h.joinedAt || '2026-08-01',
+      }))
+    } catch {
+      return []
+    }
   },
 
   async listDoctors(): Promise<PartnerDoctor[]> {
@@ -312,15 +328,12 @@ export const partnerService = {
   },
 
   async fetchApprovalRequests(): Promise<ApprovalRequest[]> {
-    await latency(300)
-    const requests = [
-      ...hospitals.map(requestFromHospital),
-      ...doctors.map(requestFromDoctor),
-      ...reviewers.map(requestFromReviewer),
-    ]
-    return requests
-      .filter(r => r.status !== 'approved')
-      .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt))
+    try {
+      const data = await apiGet<ApprovalRequest[]>('/partner-registrations')
+      return data
+    } catch {
+      return []
+    }
   },
 
   async getLastRegistration(): Promise<ApprovalRequest | null> {
@@ -329,52 +342,15 @@ export const partnerService = {
   },
 
   async approveRequest(id: string): Promise<ApprovalRequest> {
-    await latency(450)
-    const hospital = hospitals.find(h => `hreq-${h.id}` === id)
-    if (hospital) {
-      hospital.status = 'active'
-      delete hospital.reviewMessage
-      return requestFromHospital(hospital)
-    }
-    const doctor = doctors.find(d => `dreq-${d.id}` === id)
-    if (doctor) {
-      doctor.status = 'active'
-      delete doctor.reviewMessage
-      return requestFromDoctor(doctor)
-    }
-    const reviewer = reviewers.find(r => `rreq-${r.id}` === id)
-    if (reviewer) {
-      reviewer.status = 'active'
-      delete reviewer.reviewMessage
-      return requestFromReviewer(reviewer)
-    }
-    throw new Error('Approval request not found.')
+    return apiPatch<ApprovalRequest>(`/partner-registrations/${id}/approve`)
   },
 
   async rejectRequest(id: string, message: string): Promise<ApprovalRequest> {
-    await latency(400)
-    const target = hospitals.find(h => `hreq-${h.id}` === id) ??
-      doctors.find(d => `dreq-${d.id}` === id) ??
-      reviewers.find(r => `rreq-${r.id}` === id)
-    if (!target) throw new Error('Approval request not found.')
-    target.status = 'rejected'
-    target.reviewMessage = message || undefined
-    if (hospitalById(target.id)) return requestFromHospital(target as PartnerHospital)
-    if (doctorById(target.id)) return requestFromDoctor(target as PartnerDoctor)
-    return requestFromReviewer(target as PartnerReviewer)
+    return apiPatch<ApprovalRequest>(`/partner-registrations/${id}/reject`, { message })
   },
 
   async requestInfo(id: string, message: string): Promise<ApprovalRequest> {
-    await latency(400)
-    const target = hospitals.find(h => `hreq-${h.id}` === id) ??
-      doctors.find(d => `dreq-${d.id}` === id) ??
-      reviewers.find(r => `rreq-${r.id}` === id)
-    if (!target) throw new Error('Approval request not found.')
-    target.status = 'info_requested'
-    target.reviewMessage = message || undefined
-    if (hospitalById(target.id)) return requestFromHospital(target as PartnerHospital)
-    if (doctorById(target.id)) return requestFromDoctor(target as PartnerDoctor)
-    return requestFromReviewer(target as PartnerReviewer)
+    return apiPatch<ApprovalRequest>(`/partner-registrations/${id}/request-info`, { message })
   },
 
   async regenerateHospitalCode(hospitalId: string): Promise<PartnerHospital> {

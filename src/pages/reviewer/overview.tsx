@@ -1,9 +1,12 @@
 import { useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useAuth } from '@/hooks/useAuth'
 import {
   ArrowRight,
+  Building2,
   CheckCircle2,
   ClipboardList,
+  Clock,
   FileCheck2,
   FileWarning,
   FolderOpen,
@@ -17,15 +20,58 @@ import { KpiCard } from '@/components/ui/kpi-card'
 import { PageLoader } from '@/components/ui/spinner'
 import { StatusBadge, reviewerAppStatusMeta } from '@/components/ui/status-badge'
 import { Avatar } from '@/components/ui/avatar'
-import { ReviewerApplicationsTable } from '@/components/reviewer/applications-table'
+import { ReviewerQueueList } from '@/components/reviewer/queue-list'
 import { useReviewerApplications } from '@/lib/reviewerQueries'
 import { formatDate } from '@/lib/utils'
 
 const today = () => new Date().toISOString().slice(0, 10)
 
 export function ReviewerOverviewPage() {
+  const { user, logout } = useAuth()
+  const reviewerStatus = user?.reviewer?.status
+
+  if (reviewerStatus !== 'active') {
+    return (
+      <div>
+        <PageHeader title="Reviewer Dashboard" subtitle="Your account is pending hospital approval." />
+        <div className="mt-8 mx-auto max-w-lg">
+          <div className="rounded-3xl border border-amber-200 bg-white p-8 shadow-soft text-center">
+            <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-amber-100 text-amber-600">
+              <Clock className="size-7" aria-hidden />
+            </span>
+            <h2 className="mt-4 font-display text-xl font-bold text-ink-900">
+              Account Awaiting Hospital Approval
+            </h2>
+            <p className="mt-2 text-sm text-ink-600 leading-relaxed">
+              Your reviewer account has been created and is pending approval from your associated hospital.
+              You will be notified once the hospital reviews your registration.
+            </p>
+            <div className="mt-6 inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-800">
+              <span className="h-2 w-2 rounded-full bg-amber-500" />
+              Status: {reviewerStatus === 'pending' ? 'Awaiting Approval' : reviewerStatus ?? 'Unknown'}
+            </div>
+            <p className="mt-4 text-xs text-ink-500">
+              Please check your notifications for updates.
+            </p>
+            <div className="mt-6 flex flex-col gap-3">
+              <button
+                type="button"
+                onClick={() => logout()}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-ink-200 px-4 py-2.5 text-sm font-semibold text-ink-700 transition-colors hover:bg-ink-50"
+              >
+                Log out
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   const applications = useReviewerApplications()
   const navigate = useNavigate()
+
+  const hospitalName = user?.reviewer?.hospitalName ?? null
 
   const stats = useMemo(() => {
     const all = applications.data ?? []
@@ -55,15 +101,27 @@ export function ReviewerOverviewPage() {
     <div>
       <PageHeader
         title="Reviewer Dashboard"
-        subtitle="Today's workload — review, verify, and decide."
+        subtitle={
+          hospitalName
+            ? `Welcome back, ${user?.name ?? 'Reviewer'}. You're affiliated with ${hospitalName}.`
+            : "Today's workload — review, verify, and decide."
+        }
         actions={
-          <Link
-            to="/dashboard/reviewer/documents"
-            className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-glow transition-colors hover:bg-brand-700"
-          >
-            <FileCheck2 className="size-4" aria-hidden />
-            Verify documents
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            {hospitalName && (
+              <span className="inline-flex items-center gap-2 rounded-xl border border-ink-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-700">
+                <Building2 className="size-4 text-brand-600" aria-hidden />
+                {hospitalName}
+              </span>
+            )}
+            <Link
+              to="/dashboard/reviewer/documents"
+              className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-glow transition-colors hover:bg-brand-700"
+            >
+              <FileCheck2 className="size-4" aria-hidden />
+              Verify documents
+            </Link>
+          </div>
         }
       />
 
@@ -131,7 +189,7 @@ export function ReviewerOverviewPage() {
               <ArrowRight className="size-4" aria-hidden />
             </Link>
           </div>
-          <ReviewerApplicationsTable data={all} pageSize={6} />
+          <ReviewerQueueList data={all} pageSize={6} />
         </section>
 
         <aside className="space-y-6">

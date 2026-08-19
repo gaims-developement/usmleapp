@@ -10,8 +10,33 @@ const palettes = [
   'bg-rose-100 text-rose-700',
 ]
 
-export function Avatar({ name, className }: { name: string; className?: string }) {
+export function Avatar({
+  name,
+  src,
+  className,
+}: {
+  name: string
+  src?: string | null
+  className?: string
+}) {
   const index = [...name].reduce((acc, ch) => acc + ch.charCodeAt(0), 0) % palettes.length
+
+  if (src) {
+    return (
+      <span
+        className={cn('grid size-9 shrink-0 place-items-center overflow-hidden rounded-full', className)}
+        aria-hidden
+      >
+        <img
+          src={src}
+          alt=""
+          className="size-full rounded-full object-cover"
+          referrerPolicy="no-referrer"
+        />
+      </span>
+    )
+  }
+
   return (
     <span
       className={cn(

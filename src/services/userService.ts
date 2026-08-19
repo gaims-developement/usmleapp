@@ -1,5 +1,5 @@
 import type { AuthUser, RoleId } from '@/types/rbac'
-import { apiGet, apiPatch } from '@/lib/apiClient'
+import { apiDelete, apiFormPost, apiGet, apiPatch } from '@/lib/apiClient'
 
 export interface CreateUserInput {
   name: string
@@ -36,6 +36,18 @@ export const userService = {
   async findById(id: string): Promise<AuthUser | null> {
     const { user } = await apiGet<{ user: AuthUser }>(`/users/me`)
     return user.id === id ? user : null
+  },
+
+  async uploadAvatar(file: File): Promise<AuthUser> {
+    const formData = new FormData()
+    formData.append('avatar', file)
+    const { user } = await apiFormPost<{ user: AuthUser }>(`/users/me/avatar`, formData)
+    return user
+  },
+
+  async removeAvatar(): Promise<AuthUser> {
+    const { user } = await apiDelete<{ user: AuthUser }>(`/users/me/avatar`)
+    return user
   },
 
   async findByEmail(email: string): Promise<AuthUser | null> {

@@ -1,118 +1,69 @@
-import {
-  adminAnalytics,
-  adminKpis,
-  platformUptime,
-  recentActivity,
-  type AdminActivityItem,
-  type AdminAnalytics,
-  type AdminKpi,
-  type UptimeService,
+import { Activity } from 'lucide-react'
+import type {
+  AdminActivityItem,
+  AdminAnalytics,
+  AdminKpi,
+  UptimeService,
 } from '@/mocks/admin/dashboard'
-import {
-  adminDoctors,
-  adminHospitals,
-  adminUsers,
-  type AdminUser,
-  type DoctorRecord,
-  type HospitalRecord,
-  type ReviewerRecord,
+import type {
+  AdminUser,
+  DoctorRecord,
+  HospitalRecord,
+  ReviewerRecord,
 } from '@/mocks/admin/people'
-import {
-  adminApplications,
-  adminDocuments,
-  adminPrograms,
-  type AdminApplication,
-  type DocRecord,
-  type DocVerificationStatus,
-  type PaymentRecord,
-  type ProgramRecord,
-  type ProgramStatus,
+import type {
+  AdminApplication,
+  DocRecord,
+  DocVerificationStatus,
+  PaymentRecord,
+  ProgramRecord,
+  ProgramStatus,
 } from '@/mocks/admin/operations'
-import {
-  adminAnnouncements,
-  auditLogs,
-  cmsPages,
-  roleSummaries,
-  supportTickets,
-  type Announcement,
-  type AnnouncementStatus,
-  type AuditLog,
-  type CmsPage,
-  type RoleSummary,
-  type SupportTicket,
-  type SupportStatus,
+import type {
+  Announcement,
+  AnnouncementStatus,
+  AuditLog,
+  CmsPage,
+  RoleSummary,
+  SupportTicket,
+  SupportStatus,
 } from '@/mocks/admin/content'
-import {
-  adminNotifications,
-  adminOpsKpis,
-  reportCatalog,
-  type AdminNotification,
-  type NotificationTone,
-  type OpsKpi,
-  type ReportDefinition,
+import type {
+  AdminNotification,
+  NotificationTone,
+  OpsKpi,
+  ReportDefinition,
 } from '@/mocks/admin/ops'
-import { type AdminStudent } from '@/mocks/admin/students'
-import { platformSettings, type PlatformSettings } from '@/mocks/admin/settings'
-import { addStudentNotification } from '@/services/studentService'
-import { apiGet, apiPatch } from '@/lib/apiClient'
-
-const latency = (ms = 300) => new Promise(resolve => setTimeout(resolve, ms))
-
-const today = () => new Date().toISOString().slice(0, 10)
-
-// Helper to access localStorage statefully
-function getStoredState<T>(key: string, fallback: T): T {
-  const data = localStorage.getItem(key)
-  if (!data) {
-    localStorage.setItem(key, JSON.stringify(fallback))
-    return fallback
-  }
-  return JSON.parse(data)
-}
-
-function setStoredState<T>(key: string, value: T): void {
-  localStorage.setItem(key, JSON.stringify(value))
-}
-
-const getApplications = () => getStoredState('usmle_admin_applications', adminApplications)
-const setApplications = (val: AdminApplication[]) => setStoredState('usmle_admin_applications', val)
-
-const getAnnouncements = () => getStoredState('usmle_admin_announcements', adminAnnouncements)
-const setAnnouncements = (val: Announcement[]) => setStoredState('usmle_admin_announcements', val)
-
-const getTickets = () => getStoredState('usmle_admin_tickets', supportTickets)
-const setTickets = (val: SupportTicket[]) => setStoredState('usmle_admin_tickets', val)
-
-const getHospitals = () => getStoredState('usmle_admin_hospitals', adminHospitals)
-const setHospitals = (val: HospitalRecord[]) => setStoredState('usmle_admin_hospitals', val)
-
-const getPrograms = () => getStoredState('usmle_admin_programs', adminPrograms)
-const setPrograms = (val: ProgramRecord[]) => setStoredState('usmle_admin_programs', val)
-
-const getNotifications = () => getStoredState('usmle_admin_notifications', adminNotifications)
-const setNotifications = (val: AdminNotification[]) => setStoredState('usmle_admin_notifications', val)
-
-const getDocuments = () => getStoredState('usmle_admin_documents', adminDocuments)
-const setDocuments = (val: DocRecord[]) => setStoredState('usmle_admin_documents', val)
+import { reportCatalog as mockReportCatalog } from '@/mocks/admin/ops'
+import type { AdminStudent } from '@/mocks/admin/students'
+import type { PlatformSettings } from '@/mocks/admin/settings'
+import { apiGet, apiPatch, apiPost, apiDelete } from '@/lib/apiClient'
 
 export async function fetchAdminKpis(): Promise<AdminKpi[]> {
-  await latency(200)
-  return [...adminKpis]
+  const res = await apiGet<AdminKpi[]>('/admin/kpis')
+  return res
 }
 
 export async function fetchAdminAnalytics(): Promise<AdminAnalytics> {
-  await latency(350)
-  return adminAnalytics
+  const res = await apiGet<AdminAnalytics>('/admin/analytics')
+  return res
 }
 
 export async function fetchPlatformUptime(): Promise<UptimeService[]> {
-  await latency(200)
-  return [...platformUptime]
+  const res = await apiGet<UptimeService[]>('/admin/uptime')
+  return res
 }
 
 export async function fetchRecentActivity(): Promise<AdminActivityItem[]> {
-  await latency(250)
-  return recentActivity.map(item => ({ ...item }))
+  const res = await apiGet<any[]>('/admin/activity')
+  return res.map(item => ({
+    id: item.id || `act-${Math.random()}`,
+    icon: Activity,
+    title: item.title || `${item.user || 'Candidate'} — ${item.action || 'Activity'}`,
+    detail: item.detail || item.target || '',
+    time: item.time || (item.timestamp ? new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'recently'),
+    iconClassName: 'bg-brand-50 text-brand-600',
+  }))
 }
 
 export async function fetchAdminApplications(): Promise<AdminApplication[]> {
@@ -126,17 +77,27 @@ export async function fetchRecentApplications(): Promise<AdminApplication[]> {
 }
 
 export async function fetchAdminUsers(): Promise<AdminUser[]> {
-  await latency(300)
-  return [...adminUsers]
+  const res = await apiGet<any[]>('/users/all')
+  return res.map(u => ({
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    role: u.role,
+    status: u.status,
+    org: 'Platform',
+    country: 'United States',
+    joinedAt: u.createdAt,
+    applications: 0,
+  }))
 }
 
 export async function fetchAdminHospitals(): Promise<HospitalRecord[]> {
   const res = await apiGet<any[]>('/users/hospitals')
   return res.map(h => ({
     id: h.id,
-    name: h.organizationName,
-    city: h.city,
-    state: h.state,
+    name: h.organizationName || h.name,
+    city: h.city || '',
+    state: h.state || '',
     tier: 'standard',
     programs: h.programs ?? 0,
     doctors: h.doctors ?? 0,
@@ -150,8 +111,8 @@ export async function fetchAdminHospitals(): Promise<HospitalRecord[]> {
 }
 
 export async function fetchAdminDoctors(): Promise<DoctorRecord[]> {
-  await latency(300)
-  return [...adminDoctors]
+  const res = await apiGet<DoctorRecord[]>('/users/doctors')
+  return res
 }
 
 export async function fetchAdminReviewers(): Promise<ReviewerRecord[]> {
@@ -172,41 +133,72 @@ export async function fetchAdminReviewers(): Promise<ReviewerRecord[]> {
 }
 
 export async function fetchAdminPrograms(): Promise<ProgramRecord[]> {
-  await latency(300)
-  return [...getPrograms()]
+  const res = await apiGet<any[]>('/programs')
+  return res.map(p => ({
+    id: p.id,
+    title: p.title || `${p.specialty} Elective`,
+    specialty: p.specialty,
+    hospital: p.hospital,
+    city: p.city,
+    duration: Array.isArray(p.durationWeeks) ? `${p.durationWeeks.join(', ')} weeks` : '4 weeks',
+    fee: p.fee,
+    filled: p.filled ?? 0,
+    capacity: p.spots ?? 10,
+    status: p.status === 'ACTIVE' ? 'published' : 'draft',
+    startDate: p.startDates?.[0] ?? '2026-09-01',
+  }))
+}
+
+export interface StudentDocumentItem {
+  id: string
+  name: string
+  category: string
+  status: string
+  fileName: string
+  mimeType?: string | null
+  fileSize?: number | null
+  storageProvider?: string | null
+  storagePath?: string | null
+  uploadedAt: string
+  note?: string
+  version?: number
+  rejectedAt?: string | null
+}
+
+export interface StudentDocumentGroup {
+  studentId: string
+  name: string
+  email: string
+  college: string
+  graduationYear?: number | null
+  applicationsCount: number
+  totalDocs: number
+  verifiedDocs: number
+  pendingDocs: number
+  rejectedDocs: number
+  overallStatus: 'No Documents' | 'Pending Review' | 'Partially Verified' | 'Complete' | 'Action Required'
+  lastUpload: string
+  documents: StudentDocumentItem[]
 }
 
 export async function fetchAdminDocuments(): Promise<DocRecord[]> {
-  await latency(300)
-  return [...getDocuments()]
+  const res = await apiGet<DocRecord[]>('/admin/documents')
+  return res
+}
+
+export async function fetchStudentDocumentsGrouped(): Promise<StudentDocumentGroup[]> {
+  const res = await apiGet<StudentDocumentGroup[]>('/admin/documents/students')
+  return res
 }
 
 export async function fetchDocument(id: string): Promise<DocRecord | null> {
-  await latency(250)
-  return getDocuments().find(d => d.id === id) ?? null
+  const docs = await fetchAdminDocuments()
+  return docs.find(d => d.id === id) ?? null
 }
 
-export async function setDocStatus(id: string, status: DocVerificationStatus): Promise<DocRecord[]> {
-  await latency(400)
-  const docs = getDocuments()
-  const target = docs.find(d => d.id === id)
-  if (!target) return [...docs]
-  const updatedDocs = docs.map(d => (d.id === id ? { ...d, status } : d))
-  setDocuments(updatedDocs)
-
-  const firstName = target.owner.split(' ')[0]
-  if (status === 'verified') {
-    addStudentNotification(
-      'Document approved ✅',
-      `Hey ${firstName}, your ${target.document.toLowerCase()} has been verified. You're all set!`,
-    )
-  } else if (status === 'rejected') {
-    addStudentNotification(
-      'Document needs attention ⚠️',
-      `Hi ${firstName}, your ${target.document.toLowerCase()} couldn't be verified. Please re-upload a clearer copy.`,
-    )
-  }
-  return updatedDocs
+export async function setDocStatus(id: string, status: DocVerificationStatus, note?: string): Promise<DocRecord[]> {
+  await apiPatch(`/admin/documents/${id}/status`, { status, note })
+  return fetchAdminDocuments()
 }
 
 export async function fetchAdminPayments(): Promise<PaymentRecord[]> {
@@ -215,33 +207,41 @@ export async function fetchAdminPayments(): Promise<PaymentRecord[]> {
 }
 
 export async function fetchAnnouncements(): Promise<Announcement[]> {
-  await latency(300)
-  return [...getAnnouncements()]
+  const res = await apiGet<Announcement[]>('/admin/announcements')
+  return res
 }
 
 export async function fetchCmsPages(): Promise<CmsPage[]> {
-  await latency(300)
-  return [...cmsPages]
+  return [
+    { id: 'home', title: 'Home Page', slug: '/', status: 'published', updatedAt: '2026-08-01', author: 'System' },
+    { id: 'about', title: 'About Us', slug: '/about', status: 'published', updatedAt: '2026-08-01', author: 'System' },
+  ]
 }
 
 export async function fetchAuditLogs(): Promise<AuditLog[]> {
-  await latency(300)
-  return [...auditLogs]
+  const res = await apiGet<AuditLog[]>('/admin/audit-logs')
+  return res
 }
 
 export async function fetchSupportTickets(): Promise<SupportTicket[]> {
-  await latency(300)
-  return [...getTickets()]
+  const res = await apiGet<SupportTicket[]>('/admin/support-tickets')
+  return res
 }
 
 export async function fetchRoleSummaries(): Promise<RoleSummary[]> {
-  await latency(300)
-  return [...roleSummaries]
+  return [
+    { id: 'SUPER_ADMIN', name: 'Super Admin', members: 1, description: 'Full system access and management', updatedAt: '2026-08-01' },
+    { id: 'ADMIN', name: 'Admin', members: 1, description: 'Administrative ops access', updatedAt: '2026-08-01' },
+    { id: 'STUDENT', name: 'Student', members: 0, description: 'Elective applicants', updatedAt: '2026-08-01' },
+    { id: 'HOSPITAL', name: 'Hospital', members: 0, description: 'Partner hospital accounts', updatedAt: '2026-08-01' },
+    { id: 'DOCTOR', name: 'Doctor', members: 0, description: 'Attending physicians', updatedAt: '2026-08-01' },
+    { id: 'REVIEWER', name: 'Reviewer', members: 0, description: 'Application reviewers', updatedAt: '2026-08-01' },
+  ]
 }
 
 export async function fetchPlatformSettings(): Promise<PlatformSettings> {
-  await latency(300)
-  return platformSettings
+  const res = await apiGet<PlatformSettings>('/admin/settings')
+  return res
 }
 
 export async function fetchAdminStudents(): Promise<AdminStudent[]> {
@@ -250,18 +250,17 @@ export async function fetchAdminStudents(): Promise<AdminStudent[]> {
 }
 
 export async function fetchOpsKpis(): Promise<OpsKpi[]> {
-  await latency(250)
-  return adminOpsKpis.map(kpi => ({ ...kpi }))
+  const res = await apiGet<OpsKpi[]>('/admin/ops-kpis')
+  return res
 }
 
 export async function fetchNotifications(): Promise<AdminNotification[]> {
-  await latency(200)
-  return getNotifications().map(n => ({ ...n }))
+  const res = await apiGet<AdminNotification[]>('/notifications')
+  return res
 }
 
 export async function fetchReportCatalog(): Promise<ReportDefinition[]> {
-  await latency(200)
-  return reportCatalog.map(r => ({ ...r }))
+  return mockReportCatalog.map(r => ({ ...r }))
 }
 
 export interface AssignReviewerInput {
@@ -283,37 +282,13 @@ export interface ForwardApplicationInput {
 }
 
 export async function forwardApplication(input: ForwardApplicationInput): Promise<AdminApplication> {
-  await latency(400)
-  const apps = getApplications()
-  const app = apps.find(a => a.id === input.applicationId)
-  if (!app) throw new Error(`Application ${input.applicationId} not found`)
-  app.reviewer = input.reviewer
-  
-  setApplications(apps.map(a => a.id === input.applicationId ? app : a))
-
-  const notifs = getNotifications()
-  notifs.unshift({
-    id: `ntf-${Date.now()}`,
-    tone: 'info',
-    title: 'Application forwarded',
-    body: `${input.applicationId} forwarded to ${input.reviewer}.`,
-    time: 'just now',
-    read: false,
-  })
-  setNotifications(notifs)
-
-  return { ...app }
+  const res = await apiPatch<AdminApplication>(`/applications/${input.applicationId}/forward`, input)
+  return res
 }
 
 export async function toggleFlagApplication(applicationId: string): Promise<AdminApplication> {
-  await latency(250)
-  const apps = getApplications()
-  const app = apps.find(a => a.id === applicationId)
-  if (!app) throw new Error(`Application ${applicationId} not found`)
-  app.flagged = !app.flagged
-  
-  setApplications(apps.map(a => a.id === applicationId ? app : a))
-  return { ...app }
+  const res = await apiPatch<AdminApplication>(`/applications/${applicationId}/flag`, {})
+  return res
 }
 
 export interface NewHospitalInput {
@@ -323,50 +298,20 @@ export interface NewHospitalInput {
 }
 
 export async function createHospital(input: NewHospitalInput): Promise<HospitalRecord> {
-  await latency(400)
-  const record: HospitalRecord = {
-    id: `h-${Date.now()}`,
-    name: input.name,
-    city: input.city,
-    state: input.state,
-    tier: 'standard',
-    programs: 0,
-    doctors: 0,
-    students: 0,
-    rating: 0,
-    status: 'onboarding',
-    joinedAt: today(),
-    email: `${input.name.toLowerCase().replace(/[^a-z0-9]+/g, '')}@hospital.org`,
-    phone: '+1 (555) 010-0000',
-  }
-  
-  const hList = getHospitals()
-  hList.unshift(record)
-  setHospitals(hList)
-
-  return { ...record }
+  const res = await apiPost<HospitalRecord>('/hospitals', input)
+  return res
 }
 
 export async function setHospitalStatus(
   hospitalId: string,
   status: HospitalRecord['status'],
 ): Promise<HospitalRecord> {
-  await latency(300)
-  const hList = getHospitals()
-  const hospital = hList.find(h => h.id === hospitalId)
-  if (!hospital) throw new Error(`Hospital ${hospitalId} not found`)
-  hospital.status = status
-  setHospitals(hList)
-  return { ...hospital }
+  const res = await apiPatch<HospitalRecord>(`/hospitals/${hospitalId}/status`, { status })
+  return res
 }
 
 export async function removeHospital(hospitalId: string): Promise<{ removed: boolean }> {
-  await latency(300)
-  const hList = getHospitals()
-  const index = hList.findIndex(h => h.id === hospitalId)
-  if (index === -1) throw new Error(`Hospital ${hospitalId} not found`)
-  hList.splice(index, 1)
-  setHospitals(hList)
+  await apiDelete(`/hospitals/${hospitalId}`)
   return { removed: true }
 }
 
@@ -382,94 +327,71 @@ export interface NewProgramInput {
 }
 
 export async function createProgram(input: NewProgramInput): Promise<ProgramRecord> {
-  await latency(400)
-  const record: ProgramRecord = {
-    id: `prg-${Date.now()}`,
-    title: input.title,
-    specialty: input.specialty,
-    hospital: input.hospital,
-    city: input.city,
-    duration: input.duration,
-    fee: input.fee,
-    filled: 0,
-    capacity: input.capacity,
-    status: 'draft',
-    startDate: input.startDate,
-  }
-  const pList = getPrograms()
-  pList.unshift(record)
-  setPrograms(pList)
-  return { ...record }
+  const res = await apiPost<ProgramRecord>('/programs', input)
+  return res
 }
 
 export async function setProgramStatus(
   programId: string,
   status: ProgramStatus,
 ): Promise<ProgramRecord> {
-  await latency(300)
-  const pList = getPrograms()
-  const program = pList.find(p => p.id === programId)
-  if (!program) throw new Error(`Program ${programId} not found`)
-  program.status = status
-  setPrograms(pList)
-  return { ...program }
+  const res = await apiPatch<ProgramRecord>(`/programs/${programId}/status`, { status })
+  return res
 }
 
 export interface NewAnnouncementInput {
   title: string
+  body: string
   audience: string
   status: AnnouncementStatus
   publishedAt: string
 }
 
+export interface SendAnnouncementInput {
+  type: 'announcement' | 'notification'
+  title: string
+  body: string
+  audience: string[] | 'ALL'
+  priority: 'normal' | 'important' | 'urgent'
+}
+
+export interface SendAnnouncementResult {
+  id: string | null
+  title: string
+  body: string
+  audience: string
+  status: AnnouncementStatus
+  author: string
+  publishedAt: string | null
+  views: number
+  notificationsCreated: number
+}
+
+export async function sendAnnouncement(input: SendAnnouncementInput): Promise<SendAnnouncementResult> {
+  const res = await apiPost<SendAnnouncementResult>('/admin/announcements', input)
+  return res
+}
+
 export async function createAnnouncement(input: NewAnnouncementInput): Promise<Announcement> {
-  await latency(400)
-  const record: Announcement = {
-    id: `ann-${Date.now()}`,
-    title: input.title,
-    audience: input.audience,
-    status: input.status,
-    author: 'Alex Admin',
-    publishedAt: input.publishedAt,
-    views: 0,
-  }
-  const aList = getAnnouncements()
-  aList.unshift(record)
-  setAnnouncements(aList)
-  return { ...record }
+  const res = await apiPost<Announcement>('/admin/announcements', input)
+  return res
 }
 
 export async function updateAnnouncement(
   announcementId: string,
   input: Partial<NewAnnouncementInput>,
 ): Promise<Announcement> {
-  await latency(350)
-  const aList = getAnnouncements()
-  const item = aList.find(a => a.id === announcementId)
-  if (!item) throw new Error(`Announcement ${announcementId} not found`)
-  if (input.title !== undefined) item.title = input.title
-  if (input.audience !== undefined) item.audience = input.audience
-  if (input.status !== undefined) item.status = input.status
-  if (input.publishedAt !== undefined) item.publishedAt = input.publishedAt
-  setAnnouncements(aList)
-  return { ...item }
+  const res = await apiPatch<Announcement>(`/admin/announcements/${announcementId}`, input)
+  return res
 }
 
 export async function deleteAnnouncement(announcementId: string): Promise<void> {
-  await latency(300)
-  const filtered = getAnnouncements().filter(a => a.id !== announcementId)
-  setAnnouncements(filtered)
+  await apiDelete(`/admin/announcements/${announcementId}`)
 }
 
 export async function setTicketStatus(ticketId: string, status: SupportStatus): Promise<SupportTicket> {
-  await latency(300)
-  const tList = getTickets()
-  const ticket = tList.find(t => t.id === ticketId)
-  if (!ticket) throw new Error(`Ticket ${ticketId} not found`)
-  ticket.status = status
-  ticket.updatedAt = today()
-  setTickets(tList)
-  return { ...ticket }
+  const res = await apiPatch<SupportTicket>(`/admin/support-tickets/${ticketId}`, { status })
+  return res
 }
 
 export interface NewTicketInput {
@@ -480,27 +402,13 @@ export interface NewTicketInput {
 }
 
 export async function createTicket(input: NewTicketInput): Promise<SupportTicket> {
-  await latency(400)
-  const record: SupportTicket = {
-    id: `TK-${Math.floor(200 + Math.random() * 400)}`,
-    subject: input.subject,
-    from: input.from,
-    role: input.role,
-    priority: input.priority,
-    status: 'open',
-    updatedAt: today(),
-  }
-  const tList = getTickets()
-  tList.unshift(record)
-  setTickets(tList)
-  return { ...record }
+  const res = await apiPost<SupportTicket>('/admin/support-tickets', input)
+  return res
 }
 
 export async function markAllNotificationsRead(): Promise<AdminNotification[]> {
-  await latency(200)
-  const updated = getNotifications().map(n => ({ ...n, read: true }))
-  setNotifications(updated)
-  return updated
+  const res = await apiPatch<AdminNotification[]>('/notifications/read-all', {})
+  return res
 }
 
 export interface NewDoctorInput {
@@ -510,20 +418,8 @@ export interface NewDoctorInput {
 }
 
 export async function createDoctor(input: NewDoctorInput): Promise<DoctorRecord> {
-  await latency(400)
-  const record: DoctorRecord = {
-    id: `d-${Date.now()}`,
-    name: input.name,
-    specialty: input.specialty,
-    hospital: input.hospital,
-    students: 0,
-    evaluations: 0,
-    rating: 0,
-    status: 'active',
-    joinedAt: today(),
-  }
-  adminDoctors.unshift(record)
-  return { ...record }
+  const res = await apiPost<DoctorRecord>('/users/doctors', input)
+  return res
 }
 
 export type { NotificationTone }

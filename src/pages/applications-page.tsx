@@ -4,13 +4,15 @@ import { CheckCircle2, ClipboardList, X } from 'lucide-react'
 import { useApplications, useWithdrawApplication } from '@/lib/queries'
 import { PageHeader } from '@/components/ui/page-header'
 import { PageLoader } from '@/components/ui/spinner'
+import { ConfirmDialog } from '@/components/ui/modal'
 import { ApplicationCard } from '@/components/applications/application-card'
 import { EmptyState } from '@/components/ui/empty-state'
 import { cn } from '@/lib/utils'
+import type { Application } from '@/lib/types'
 
 type Filter = 'all' | 'active' | 'offers' | 'confirmed' | 'ended'
 
-const activeStatuses = ['submitted', 'under_review', 'additional_info', 'offered']
+const activeStatuses = ['submitted', 'under_review', 'additional_info', 'approved', 'offered', 'forwarded', 'waitlisted']
 const offeredStatuses = ['offered', 'confirmed']
 
 const filters: { key: Filter; label: string }[] = [
@@ -26,6 +28,7 @@ export function ApplicationsPage() {
   const justApplied = (location.state as { justApplied?: string } | null)?.justApplied
   const [bannerOpen, setBannerOpen] = useState(Boolean(justApplied))
   const [filter, setFilter] = useState<Filter>('all')
+  const [withdrawTarget, setWithdrawTarget] = useState<Application | null>(null)
   const { data, isPending } = useApplications()
   const withdraw = useWithdrawApplication()
 
@@ -41,15 +44,16 @@ export function ApplicationsPage() {
       case 'confirmed':
         return app.status === 'confirmed'
       case 'ended':
-        return app.status === 'withdrawn' || app.status === 'rejected'
+        return app.status === 'withdrawn' || app.status === 'rejected' || app.status === 'completed'
       default:
         return true
     }
   })
 
-  function handleWithdraw(id: string) {
-    if (window.confirm('Withdraw this application? You can re-apply later.')) {
-      withdraw.mutate(id)
+  function handleWithdraw() {
+    if (withdrawTarget) {
+      withdraw.mutate(withdrawTarget.id)
+      setWithdrawTarget(null)
     }
   }
 
@@ -102,7 +106,7 @@ export function ApplicationsPage() {
             <ApplicationCard
               key={app.id}
               app={app as any}
-              onWithdraw={() => handleWithdraw(app.id)}
+              onWithdraw={() => setWithdrawTarget(app)}
               withdrawPending={withdraw.isPending}
             />
           ))}
@@ -120,6 +124,22 @@ export function ApplicationsPage() {
           actionTo={apps.length === 0 ? '/electives' : undefined}
         />
       )}
+
+      <ConfirmDialog
+        open={withdrawTarget !== null}
+        onClose={() => setWithdrawTarget(null)}
+        onConfirm={handleWithdraw}
+        title="Withdraw application"
+        description={
+          withdrawTarget
+            ? `Are you sure you want to withdraw your ${withdrawTarget.specialty} application at ${withdrawTarget.hospital}? You can re-apply later.`
+            : ''
+        }
+        confirmLabel="Withdraw"
+        cancelLabel="Keep application"
+        tone="danger"
+        loading={withdraw.isPending}
+      />
     </div>
   )
 }

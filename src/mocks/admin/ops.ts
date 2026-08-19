@@ -106,6 +106,7 @@ export interface AdminNotification {
   body: string
   time: string
   read: boolean
+  createdAt?: string | null
 }
 
 export const adminNotifications: AdminNotification[] = [

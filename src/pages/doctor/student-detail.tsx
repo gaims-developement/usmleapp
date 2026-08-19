@@ -107,8 +107,8 @@ export function DoctorStudentDetailPage() {
                     tone={evaluationStatusMeta(studentEval?.status ?? 'draft').tone}
                   />
                   <StatusBadge
-                    label={student.rotationStart >= '2026-11-02' ? 'Starting soon' : 'In rotation'}
-                    tone={student.rotationStart >= '2026-11-02' ? 'amber' : 'brand'}
+                    label={student.rotationStart && student.rotationStart > new Date().toISOString().slice(0, 10) ? 'Starting soon' : 'In rotation'}
+                    tone={student.rotationStart && student.rotationStart > new Date().toISOString().slice(0, 10) ? 'amber' : 'brand'}
                   />
                 </div>
               </div>

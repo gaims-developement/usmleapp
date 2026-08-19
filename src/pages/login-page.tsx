@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Container } from '@/components/ui/container'
 import { AuthField } from '@/pages/signup-page'
 import { roleDashboardPath } from '@/roles/roles'
-import { AuthError } from '@/services/authService'
+
 
 export function LoginPage() {
   const { login } = useAuth()
@@ -23,17 +23,28 @@ export function LoginPage() {
     setError(null)
     try {
       const result = await login({ email, password })
-      navigate(roleDashboardPath(result.user.role), { replace: true })
+      const { role } = result.user
+      const profileStatus =
+        role === 'HOSPITAL' ? result.user.hospital?.status :
+        role === 'DOCTOR' ? result.user.doctor?.status :
+        role === 'REVIEWER' ? result.user.reviewer?.status :
+        null
+
+      if (profileStatus === 'pending') {
+        navigate('/account/pending', { replace: true })
+      } else {
+        navigate(roleDashboardPath(role), { replace: true })
+      }
     } catch (err) {
-      setError(err instanceof AuthError ? err.message : 'Something went wrong. Please try again.')
+      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
       setSubmitting(false)
     }
   }
 
   return (
-    <section className="flex min-h-screen items-center bg-gradient-to-b from-accent-50/60 to-white px-4 py-24">
-      <Container className="max-w-md">
-        <div className="mb-8 text-center">
+    <section className="flex min-h-screen items-center bg-gradient-to-b from-accent-50/60 to-white px-4 py-24 md:min-h-0 md:items-start md:py-10">
+      <Container className="max-w-md md:max-w-lg">
+        <div className="mb-8 text-center md:mb-4">
           <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-accent-600 text-white shadow-lift">
             <Stethoscope className="size-6" aria-hidden />
           </span>
@@ -43,7 +54,7 @@ export function LoginPage() {
 
         <form
           onSubmit={handleSubmit}
-          className="rounded-3xl border border-ink-200 bg-white p-8 shadow-soft"
+          className="rounded-3xl border border-ink-200 bg-white p-8 shadow-soft md:p-8"
         >
           <AuthField
             label="Email address"

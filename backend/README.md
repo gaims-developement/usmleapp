@@ -100,7 +100,10 @@ e.g. `requireRoles('SUPER_ADMIN', 'ADMIN')`.
 
 ### Seed accounts
 
-`npm run prisma:seed` creates role/permission rows plus demo users (password
-`Admin@123`) for every role: `admin@imgprep.com` (SUPER_ADMIN),
-`ops@imgprep.com` (ADMIN), `student@imgprep.com`, `reviewer@imgprep.com`,
-`hospital@imgprep.com`, `doctor@imgprep.com`.
+`npm run prisma:seed` seeds the canonical roles/permissions rows, a real
+Super Admin (`isDemo = false`, credentials from `SUPER_ADMIN_EMAIL` /
+`SUPER_ADMIN_PASSWORD` env vars), plus one demo account per role (password
+`DemoPass@2024!`): `admin@demo.com` (ADMIN), `student@demo.com` (STUDENT),
+`reviewer@demo.com` (REVIEWER), `hospital@demo.com` (HOSPITAL),
+`doctor@demo.com` (DOCTOR). Demo accounts are `isDemo = true` and fully
+isolated from real users.

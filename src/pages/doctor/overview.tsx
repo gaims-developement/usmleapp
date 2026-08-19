@@ -2,8 +2,10 @@ import { useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   Award,
+  Building2,
   CalendarDays,
   ClipboardList,
+  Clock,
   FileSignature,
   Inbox,
   MessageSquareText,
@@ -17,6 +19,7 @@ import { PageLoader } from '@/components/ui/spinner'
 import { StatusBadge, logbookStatusMeta } from '@/components/ui/status-badge'
 import { Avatar } from '@/components/ui/avatar'
 import { SCHEDULE_TYPES } from '@/mocks/doctor/schedule'
+import { useAuth } from '@/hooks/useAuth'
 import {
   useCertificates,
   useDoctorConversations,
@@ -30,6 +33,47 @@ import {
 import { formatDate } from '@/lib/utils'
 
 export function DoctorOverviewPage() {
+  const { user, logout } = useAuth()
+  const doctorStatus = user?.doctor?.status
+
+  if (doctorStatus !== 'active') {
+    return (
+      <div>
+        <PageHeader title="Doctor Dashboard" subtitle="Your account is pending hospital approval." />
+        <div className="mt-8 mx-auto max-w-lg">
+          <div className="rounded-3xl border border-amber-200 bg-white p-8 shadow-soft text-center">
+            <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-amber-100 text-amber-600">
+              <Clock className="size-7" aria-hidden />
+            </span>
+            <h2 className="mt-4 font-display text-xl font-bold text-ink-900">
+              Account Awaiting Hospital Approval
+            </h2>
+            <p className="mt-2 text-sm text-ink-600 leading-relaxed">
+              Your doctor account has been created and is pending approval from your associated hospital.
+              You will be notified once the hospital reviews your registration.
+            </p>
+            <div className="mt-6 inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-800">
+              <span className="h-2 w-2 rounded-full bg-amber-500" />
+              Status: {doctorStatus === 'pending' ? 'Awaiting Approval' : doctorStatus ?? 'Unknown'}
+            </div>
+            <p className="mt-4 text-xs text-ink-500">
+              Please check your notifications for updates.
+            </p>
+            <div className="mt-6 flex flex-col gap-3">
+              <button
+                type="button"
+                onClick={() => logout()}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-ink-200 px-4 py-2.5 text-sm font-semibold text-ink-700 transition-colors hover:bg-ink-50"
+              >
+                Log out
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   const students = useDoctorStudents()
   const schedule = useTodaySchedule()
   const upcoming = useUpcomingRotationStarts()
@@ -61,19 +105,36 @@ export function DoctorOverviewPage() {
   const pendingEntries = (logbook.data ?? []).filter(e => e.status === 'pending').slice(0, 5)
   const unreadConversations = (conversations.data ?? []).filter(c => c.unread > 0)
 
+  const firstName = user?.name.split(' ')[0] ?? 'Doctor'
+  const hospitalName = user?.doctor?.hospitalName ?? null
+  const departmentName = user?.doctor?.departmentName ?? null
+  const affiliation = [departmentName, hospitalName].filter(Boolean).join(' · ')
+
   return (
     <div>
       <PageHeader
         title="Doctor Dashboard"
-        subtitle="Welcome back, Dr. Alan Cross. Here's what needs your attention today."
+        subtitle={
+          affiliation
+            ? `Welcome back, ${firstName}. You're affiliated with ${affiliation}.`
+            : `Welcome back, ${firstName}. Here's what needs your attention today.`
+        }
         actions={
-          <Link
-            to="/dashboard/doctor/logbooks"
-            className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-glow transition-colors hover:bg-brand-700"
-          >
-            <ClipboardList className="size-4" aria-hidden />
-            Review logbook entries
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            {affiliation && (
+              <span className="inline-flex items-center gap-2 rounded-xl border border-ink-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-700">
+                <Building2 className="size-4 text-brand-600" aria-hidden />
+                {affiliation}
+              </span>
+            )}
+            <Link
+              to="/dashboard/doctor/logbooks"
+              className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-glow transition-colors hover:bg-brand-700"
+            >
+              <ClipboardList className="size-4" aria-hidden />
+              Review logbook entries
+            </Link>
+          </div>
         }
       />
 
@@ -90,7 +151,7 @@ export function DoctorOverviewPage() {
           label="Starting Soon"
           value={String(stats.starting)}
           icon={RotateCw}
-          delta="Nov 2 cohort"
+          delta="Starts soon"
           hint="Rotations begin this cycle"
         />
         <KpiCard
@@ -186,7 +247,7 @@ export function DoctorOverviewPage() {
               <Inbox className="size-4.5 text-amber-600" aria-hidden />
               <h3 className="font-display text-sm font-bold text-ink-900">Upcoming rotation starts</h3>
             </div>
-            <p className="mt-1 text-xs text-ink-500">{stats.starting} students begin on Nov 2</p>
+            <p className="mt-1 text-xs text-ink-500">{stats.starting} students begin this cycle</p>
             <div className="mt-4 space-y-3">
               {(upcoming.data ?? []).map(u => (
                 <button

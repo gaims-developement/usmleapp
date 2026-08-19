@@ -1,32 +1,37 @@
-import { useState } from 'react'
-import type { FormEvent } from 'react'
-import { BriefcaseMedical, CalendarDays, GraduationCap, Save, School, UserCircle } from 'lucide-react'
+import { useRef, useState } from 'react'
+import type { ChangeEvent, FormEvent } from 'react'
+import { ImageCropper } from '@/components/ui/image-cropper'
+import {
+  BriefcaseMedical,
+  CalendarDays,
+  Camera,
+  GraduationCap,
+  Save,
+  School,
+  Trash2,
+  UserCircle,
+} from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useUpdateProfile } from '@/lib/studentQueries'
+import { formatDate, formatMemberSince } from '@/lib/utils'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { StatusBadge } from '@/components/ui/status-badge'
+import { Avatar } from '@/components/ui/avatar'
 import { useToast } from '@/components/ui/toast'
+import { userService } from '@/services/userService'
 
 const visaOptions = ['F-1 student visa', 'J-1 exchange visa', 'H-1B visa', 'No visa yet', 'Other']
 const graduationYears = Array.from({ length: 12 }, (_, i) => 2019 + i)
 
-function formatDate(iso?: string) {
-  if (!iso) return '—'
-  return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  })
-}
-
 export function StudentProfilePage() {
-  const { user } = useAuth()
+  const { user, updateUser } = useAuth()
   const toast = useToast()
   const updateProfile = useUpdateProfile()
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [name, setName] = useState(user?.name ?? '')
   const [college, setCollege] = useState(user?.college ?? '')
@@ -34,8 +39,45 @@ export function StudentProfilePage() {
   const [graduationYear, setGraduationYear] = useState(user?.graduationYear ?? '')
   const [visaStatus, setVisaStatus] = useState(user?.visaStatus ?? '')
   const [saving, setSaving] = useState(false)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [removingPhoto, setRemovingPhoto] = useState(false)
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null)
 
   if (!user) return null
+
+  function handlePhotoChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    const url = URL.createObjectURL(file)
+    setCropImageSrc(url)
+  }
+
+  async function handleCroppedPhoto(file: File) {
+    setUploadingPhoto(true)
+    try {
+      const updated = await userService.uploadAvatar(file)
+      updateUser({ avatarUrl: updated.avatarUrl })
+      toast.success('Photo updated', 'Your profile photo has been saved.')
+    } catch (err) {
+      toast.error('Could not upload photo', err instanceof Error ? err.message : 'Please try again.')
+    } finally {
+      setUploadingPhoto(false)
+    }
+  }
+
+  async function handleRemovePhoto() {
+    setRemovingPhoto(true)
+    try {
+      const updated = await userService.removeAvatar()
+      updateUser({ avatarUrl: updated.avatarUrl })
+      toast.success('Photo removed', 'Your profile photo has been removed.')
+    } catch (err) {
+      toast.error('Could not remove photo', err instanceof Error ? err.message : 'Please try again.')
+    } finally {
+      setRemovingPhoto(false)
+    }
+  }
 
   async function handleSave(e: FormEvent) {
     e.preventDefault()
@@ -71,9 +113,43 @@ export function StudentProfilePage() {
 
       <div className="rounded-3xl border border-ink-200 bg-white p-6 shadow-soft">
         <div className="flex flex-wrap items-center gap-4">
-          <span className="grid size-16 place-items-center rounded-2xl bg-accent-600 text-xl font-bold text-white">
-            {(user.name ?? 'IMG').slice(0, 2).toUpperCase()}
-          </span>
+          <div className="flex items-center gap-4">
+            <Avatar name={user.name ?? 'IMG'} src={user.avatarUrl} className="size-16 text-lg" />
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={handlePhotoChange}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={uploadingPhoto}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Camera className="size-4" aria-hidden />
+                  {uploadingPhoto ? 'Uploading…' : user.avatarUrl ? 'Change photo' : 'Add photo'}
+                </Button>
+                {user.avatarUrl && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={removingPhoto}
+                    onClick={handleRemovePhoto}
+                  >
+                    <Trash2 className="size-4" aria-hidden />
+                    {removingPhoto ? 'Removing…' : 'Remove'}
+                  </Button>
+                )}
+              </div>
+              <p className="max-w-64 text-xs text-ink-400">JPEG, PNG, or WebP up to 5 MB.</p>
+            </div>
+          </div>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="font-display text-xl font-bold text-ink-900">{user.name}</h2>
@@ -82,7 +158,7 @@ export function StudentProfilePage() {
             <p className="mt-0.5 text-sm text-ink-600">{user.email}</p>
           </div>
           <div className="ml-auto text-right text-xs text-ink-500">
-            <p>Member since {formatDate(user.createdAt)}</p>
+            <p>Member since {formatMemberSince(user.createdAt)}</p>
             <p className="mt-1 font-mono text-[11px] text-ink-400">ID {user.id}</p>
           </div>
         </div>
@@ -176,6 +252,18 @@ export function StudentProfilePage() {
           </Button>
         </div>
       </form>
+
+      {cropImageSrc && (
+        <ImageCropper
+          open
+          imageSrc={cropImageSrc}
+          onCropComplete={handleCroppedPhoto}
+          onClose={() => {
+            URL.revokeObjectURL(cropImageSrc)
+            setCropImageSrc(null)
+          }}
+        />
+      )}
     </div>
   )
 }

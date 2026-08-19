@@ -20,7 +20,7 @@ import {
   startReview,
   type ReviewDraft,
 } from '@/services/reviewerService'
-import type { DocVerification, ReviewDocType } from '@/mocks/reviewer/applications'
+import type { DocVerification, ReviewDocument, ReviewerApplication } from '@/mocks/reviewer/applications'
 
 export const reviewerQueryKeys = {
   applications: ['reviewer', 'applications'] as const,
@@ -34,6 +34,30 @@ export const reviewerQueryKeys = {
 const invalidateApplication = (queryClient: ReturnType<typeof useQueryClient>, id: string) => {
   queryClient.invalidateQueries({ queryKey: reviewerQueryKeys.applications })
   queryClient.invalidateQueries({ queryKey: reviewerQueryKeys.application(id) })
+}
+
+const patchDocumentInCache = (
+  queryClient: ReturnType<typeof useQueryClient>,
+  applicationId: string,
+  documentId: string,
+  patch: Partial<Pick<ReviewDocument, 'verification' | 'note'>>,
+) => {
+  const applyToApp = (app?: ReviewerApplication): ReviewerApplication | undefined => {
+    if (!app) return app
+    return {
+      ...app,
+      documents: (app.documents ?? []).map(d =>
+        d.applicationDocumentId === documentId ? { ...d, ...patch } : d,
+      ),
+    }
+  }
+
+  queryClient.setQueryData<ReviewerApplication[]>(reviewerQueryKeys.applications, old =>
+    (old ?? []).map(a => (a.id === applicationId ? applyToApp(a)! : a)),
+  )
+  queryClient.setQueryData<ReviewerApplication>(reviewerQueryKeys.application(applicationId), old =>
+    applyToApp(old)!,
+  )
 }
 
 export const useReviewerApplications = () =>
@@ -119,18 +143,41 @@ export const useForwardToHospital = () => {
 export const useSetDocumentVerification = () => {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ applicationId, docName, verification }: { applicationId: string; docName: ReviewDocType; verification: DocVerification }) =>
-      setDocumentVerification(applicationId, docName, verification),
-    onSuccess: (app) => invalidateApplication(queryClient, app.id),
+    mutationFn: ({ applicationId, documentId, verification, note }: { applicationId: string; documentId: string; verification: DocVerification; note?: string }) =>
+      setDocumentVerification(applicationId, documentId, verification, note),
+    onMutate: async ({ applicationId, documentId, verification, note }) => {
+      await queryClient.cancelQueries({ queryKey: reviewerQueryKeys.applications })
+      await queryClient.cancelQueries({ queryKey: reviewerQueryKeys.application(applicationId) })
+      patchDocumentInCache(queryClient, applicationId, documentId, {
+        verification,
+        ...(note !== undefined ? { note } : {}),
+      })
+    },
+    onError: (_err, { applicationId }) => {
+      invalidateApplication(queryClient, applicationId)
+    },
+    onSuccess: (_data, { applicationId }) => {
+      invalidateApplication(queryClient, applicationId)
+    },
   })
 }
 
 export const useSetDocumentNote = () => {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ applicationId, docName, note }: { applicationId: string; docName: ReviewDocType; note: string }) =>
-      setDocumentNote(applicationId, docName, note),
-    onSuccess: (app) => invalidateApplication(queryClient, app.id),
+    mutationFn: ({ applicationId, documentId, note }: { applicationId: string; documentId: string; note: string }) =>
+      setDocumentNote(applicationId, documentId, note),
+    onMutate: async ({ applicationId, documentId, note }) => {
+      await queryClient.cancelQueries({ queryKey: reviewerQueryKeys.applications })
+      await queryClient.cancelQueries({ queryKey: reviewerQueryKeys.application(applicationId) })
+      patchDocumentInCache(queryClient, applicationId, documentId, { note })
+    },
+    onError: (_err, { applicationId }) => {
+      invalidateApplication(queryClient, applicationId)
+    },
+    onSuccess: (_data, { applicationId }) => {
+      invalidateApplication(queryClient, applicationId)
+    },
   })
 }
 

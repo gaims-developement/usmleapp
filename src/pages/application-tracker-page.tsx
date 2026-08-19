@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -13,6 +14,7 @@ import { useApplications, useWithdrawApplication } from '@/lib/queries'
 import { PageHeader } from '@/components/ui/page-header'
 import { PageLoader } from '@/components/ui/spinner'
 import { EmptyState } from '@/components/ui/empty-state'
+import { ConfirmDialog } from '@/components/ui/modal'
 import { applicationStatusMeta, StatusBadge } from '@/components/ui/status-badge'
 import { Button } from '@/components/ui/button'
 import { ButtonLink } from '@/components/ui/button'
@@ -24,6 +26,7 @@ export function ApplicationTrackerPage() {
   const { id } = useParams<{ id: string }>()
   const { data, isPending } = useApplications()
   const withdraw = useWithdrawApplication()
+  const [confirmOpen, setConfirmOpen] = useState(false)
 
   if (isPending) return <PageLoader label="Loading application…" />
 
@@ -46,13 +49,12 @@ export function ApplicationTrackerPage() {
 
   const meta = applicationStatusMeta(app.status)
   const doneCount = app.timeline.filter(t => t.done).length
-  const canWithdraw = !['withdrawn', 'rejected', 'confirmed'].includes(app.status)
+  const canWithdraw = !['withdrawn', 'rejected', 'confirmed', 'completed'].includes(app.status)
   const applicationId = app.id
 
   function handleWithdraw() {
-    if (window.confirm('Withdraw this application? You can re-apply later.')) {
-      withdraw.mutate(applicationId)
-    }
+    setConfirmOpen(false)
+    withdraw.mutate(applicationId)
   }
 
   return (
@@ -75,7 +77,7 @@ export function ApplicationTrackerPage() {
             {canWithdraw && (
               <Button
                 variant="outline"
-                onClick={handleWithdraw}
+                onClick={() => setConfirmOpen(true)}
                 disabled={withdraw.isPending}
                 className="text-ink-500 hover:text-red-700"
               >
@@ -126,7 +128,9 @@ export function ApplicationTrackerPage() {
                       <p className={cn('text-sm font-semibold', step.done ? 'text-ink-900' : 'text-ink-500')}>
                         {step.label}
                       </p>
-                      <p className="mt-0.5 text-xs text-ink-400">{formatDate(step.date)}</p>
+                      <p className="mt-0.5 text-xs text-ink-400">
+                        {step.date ? formatDate(step.date) : '—'}
+                      </p>
                     </div>
                   </li>
                 )
@@ -180,6 +184,18 @@ export function ApplicationTrackerPage() {
           </section>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={handleWithdraw}
+        title="Withdraw application"
+        description={`Are you sure you want to withdraw your ${app.specialty} application at ${app.hospital}? You can re-apply later.`}
+        confirmLabel="Withdraw"
+        cancelLabel="Keep application"
+        tone="danger"
+        loading={withdraw.isPending}
+      />
     </div>
   )
 }

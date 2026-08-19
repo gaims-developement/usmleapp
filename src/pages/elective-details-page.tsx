@@ -41,6 +41,9 @@ export function ElectiveDetailsPage() {
     a => a.electiveId === elective.id && !['withdrawn', 'rejected'].includes(a.status),
   )
 
+  const hasRating = typeof elective.rating === 'number'
+  const durationLabel = elective.durationWeeks.length ? elective.durationWeeks.join(' or ') + ' weeks' : '—'
+
   return (
     <div className="space-y-6">
       <Link
@@ -55,15 +58,17 @@ export function ElectiveDetailsPage() {
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="font-display text-2xl font-bold text-ink-900">{elective.specialty}</h1>
-            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
-              <Star className="size-3.5 fill-amber-400 text-amber-400" aria-hidden />
-              {elective.rating.toFixed(1)}
-            </span>
+            {hasRating && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                <Star className="size-3.5 fill-amber-400 text-amber-400" aria-hidden />
+                {elective.rating!.toFixed(1)}
+              </span>
+            )}
             <StatusBadge
               label={elective.spots <= 4 ? `${elective.spots} spots left` : `${elective.spots} spots available`}
               tone={elective.spots <= 4 ? 'amber' : 'brand'}
             />
-            <StatusBadge label={elective.teachingType} tone="sky" />
+            {elective.teachingType && <StatusBadge label={elective.teachingType} tone="sky" />}
           </div>
           <p className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-600">
             <span className="inline-flex items-center gap-1.5">
@@ -101,12 +106,17 @@ export function ElectiveDetailsPage() {
 
             <h3 className="mt-6 text-sm font-bold uppercase tracking-wide text-ink-400">Highlights</h3>
             <ul className="mt-3 grid gap-2 sm:grid-cols-2">
-              {elective.highlights.map(h => (
+              {(elective.highlights ?? []).map(h => (
                 <li key={h} className="flex items-start gap-2 text-sm text-ink-700">
                   <Check className="mt-0.5 size-4 shrink-0 text-brand-600" aria-hidden />
                   {h}
                 </li>
               ))}
+              {(elective.highlights ?? []).length === 0 && (
+                <li className="text-sm text-ink-500">
+                  No highlights published yet — check back soon.
+                </li>
+              )}
             </ul>
           </div>
 
@@ -153,6 +163,12 @@ export function ElectiveDetailsPage() {
                   </span>
                 </button>
               ))}
+              {elective.startDates.length === 0 && (
+                <p className="rounded-xl border border-dashed border-ink-200 px-4 py-6 text-center text-sm text-ink-500 sm:col-span-3">
+                  No start dates published yet. You can still apply and choose your preferred start
+                  date.
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -164,7 +180,7 @@ export function ElectiveDetailsPage() {
               <FactRow
                 icon={<Clock className="size-4 text-ink-400" aria-hidden />}
                 label="Duration"
-                value={`${elective.durationWeeks.join(' or ')} weeks`}
+                value={durationLabel}
               />
               <FactRow
                 icon={<DollarSign className="size-4 text-ink-400" aria-hidden />}
@@ -179,7 +195,7 @@ export function ElectiveDetailsPage() {
               <FactRow
                 icon={<Building2 className="size-4 text-ink-400" aria-hidden />}
                 label="Teaching format"
-                value={elective.teachingType}
+                value={elective.teachingType ?? '—'}
               />
             </dl>
           </div>
@@ -189,7 +205,9 @@ export function ElectiveDetailsPage() {
             <p className="mt-1 text-sm text-brand-50">
               {alreadyApplied
                 ? 'You already have an active application for this rotation.'
-                : `Secure your ${elective.durationWeeks[0]}-week rotation with a quick, guided application.`}
+                : elective.durationWeeks[0]
+                  ? `Secure your ${elective.durationWeeks[0]}-week rotation with a quick, guided application.`
+                  : 'Secure your rotation with a quick, guided application.'}
             </p>
             {alreadyApplied ? (
               <ButtonLink to="/applications" variant="white" className="mt-4 w-full">

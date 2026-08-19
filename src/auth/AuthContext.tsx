@@ -9,7 +9,14 @@ import type {
   RoleId,
 } from '@/types/rbac'
 import { roleById } from '@/roles/roles'
+import { hasRole as centralHasRole } from '@/permissions/access'
 import { authService } from '@/services/authService'
+import type {
+  DoctorRegisterInput,
+  HospitalRegisterInput,
+  PendingRegistrationResult,
+  ReviewerRegisterInput,
+} from '@/services/authService'
 import { sessionService } from '@/services/sessionService'
 import { userService } from '@/services/userService'
 import { addStudentNotification } from '@/services/studentService'
@@ -25,7 +32,11 @@ export interface AuthContextValue {
   login: (credentials: LoginCredentials) => Promise<LoginResult>
   logout: () => Promise<void>
   signUp: (input: CreateUserInput) => Promise<AuthUser>
+  registerHospital: (input: HospitalRegisterInput) => Promise<PendingRegistrationResult>
+  registerDoctor: (input: DoctorRegisterInput) => Promise<PendingRegistrationResult>
+  registerReviewer: (input: ReviewerRegisterInput) => Promise<PendingRegistrationResult>
   completeOnboarding: (patch: Partial<AuthUser>) => Promise<void>
+  updateUser: (patch: Partial<AuthUser>) => void
   hasPermission: (permission: Permission) => boolean
   hasRole: (...roles: RoleId[]) => boolean
 }
@@ -96,6 +107,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return result.user
   }, [])
 
+  const registerHospital = useCallback(async (input: HospitalRegisterInput) => {
+    const result = await authService.registerHospital(input)
+    setUser(result.user)
+    return result
+  }, [])
+
+  const registerDoctor = useCallback(async (input: DoctorRegisterInput) => {
+    const result = await authService.registerDoctor(input)
+    setUser(result.user)
+    return result
+  }, [])
+
+  const registerReviewer = useCallback(async (input: ReviewerRegisterInput) => {
+    const result = await authService.registerReviewer(input)
+    setUser(result.user)
+    return result
+  }, [])
+
   const completeOnboarding = useCallback(async (patch: Partial<AuthUser>) => {
     if (!user) return
     const updated = await userService.update(user.id, patch)
@@ -117,6 +146,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [user])
 
+  const updateUser = useCallback((patch: Partial<AuthUser>) => {
+    setUser(current => {
+      if (!current) return current
+      const next = { ...current, ...patch }
+      sessionService.update(patch)
+      return next
+    })
+  }, [])
+
   const role = user ? roleById(user.role) : null
   const permissions = user ? roleById(user.role).permissions : NO_PERMISSIONS
 
@@ -125,7 +163,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [permissions],
   )
 
-  const hasRole = useCallback((...roles: RoleId[]) => (user ? roles.includes(user.role) : false), [user])
+  const hasRole = useCallback(
+    (...roles: RoleId[]) => centralHasRole(user?.role, ...roles),
+    [user],
+  )
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -136,11 +177,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       logout,
       signUp,
+      registerHospital,
+      registerDoctor,
+      registerReviewer,
       completeOnboarding,
+      updateUser,
       hasPermission,
       hasRole,
     }),
-    [user, role, permissions, login, logout, signUp, completeOnboarding, hasPermission, hasRole],
+    [
+      user,
+      role,
+      permissions,
+      login,
+      logout,
+      signUp,
+      registerHospital,
+      registerDoctor,
+      registerReviewer,
+      completeOnboarding,
+      updateUser,
+      hasPermission,
+      hasRole,
+    ],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

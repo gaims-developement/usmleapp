@@ -25,10 +25,15 @@ function buildAdapterConfig() {
     database: safeDecode(url.pathname.replace(/^\//, '')),
   }
 
-  if (url.searchParams.get('ssl') === 'true') {
+  const sslEnabled = url.searchParams.get('ssl') === 'true'
+  if (sslEnabled) {
     const dbDir = path.dirname(fileURLToPath(import.meta.url))
     const caCertPath = path.resolve(dbDir, '..', '..', '..', 'aiven-ca.pem')
     config.ssl = { ca: readFileSync(caCertPath, 'utf8'), rejectUnauthorized: true }
+  } else {
+    // Local MySQL 8+ defaults to `caching_sha2_password`, which requires the
+    // client to fetch the server's RSA public key over a non-TLS connection.
+    config.allowPublicKeyRetrieval = true
   }
 
   return config

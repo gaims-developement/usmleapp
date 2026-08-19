@@ -61,7 +61,6 @@ export function AdminReportsPage() {
           hospital: a.hospital,
           specialty: a.specialty,
           status: a.status,
-          priority: a.priority,
           reviewer: a.reviewer,
           amount: formatCurrency(a.amount),
           submittedAt: a.submittedAt,

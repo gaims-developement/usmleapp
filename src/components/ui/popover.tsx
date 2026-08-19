@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
@@ -10,6 +10,8 @@ interface PopoverProps {
   className?: string
   panelClassName?: string
   closeOnSelect?: boolean
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 export function Popover({
@@ -19,9 +21,24 @@ export function Popover({
   className,
   panelClassName,
   closeOnSelect = false,
+  open: openProp,
+  onOpenChange,
 }: PopoverProps) {
-  const [open, setOpen] = useState(false)
+  const [internalOpen, setInternalOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
+  const isControlled = openProp !== undefined
+  const open = isControlled ? openProp : internalOpen
+
+  const setOpen = useCallback(
+    (next: boolean) => {
+      if (isControlled) {
+        onOpenChange?.(next)
+      } else {
+        setInternalOpen(next)
+      }
+    },
+    [isControlled, onOpenChange],
+  )
 
   useEffect(() => {
     if (!open) return
@@ -37,13 +54,13 @@ export function Popover({
       document.removeEventListener('mousedown', onDocClick)
       document.removeEventListener('keydown', onKey)
     }
-  }, [open])
+  }, [open, setOpen])
 
   return (
     <div ref={rootRef} className={cn('relative', className)}>
       <button
         type="button"
-        onClick={() => setOpen(o => !o)}
+        onClick={() => setOpen(!open)}
         aria-haspopup="true"
         aria-expanded={open}
         className="cursor-pointer"

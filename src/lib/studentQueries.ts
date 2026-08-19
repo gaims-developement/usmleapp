@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { studentService } from '@/services/studentService'
-import type { StudentSettings } from '@/services/studentService'
+import type { StudentSettings, SubmitLogbookInput } from '@/services/studentService'
 import type { UpdateUserInput } from '@/services/userService'
 
 export const studentQueryKeys = {
@@ -9,6 +9,7 @@ export const studentQueryKeys = {
   profile: ['profile'] as const,
   settings: ['settings'] as const,
   notifications: ['student', 'notifications'] as const,
+  logbook: (applicationId: string) => ['student', 'logbook', applicationId] as const,
 }
 
 export function useStudyResources() {
@@ -66,6 +67,34 @@ export function useMarkStudentNotificationsRead() {
     mutationFn: () => studentService.markAllNotificationsRead(),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: studentQueryKeys.notifications })
+    },
+  })
+}
+
+export function useMarkStudentNotificationRead() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => studentService.markNotificationRead(id),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: studentQueryKeys.notifications })
+    },
+  })
+}
+
+export function useLogbook(applicationId: string) {
+  return useQuery({
+    queryKey: studentQueryKeys.logbook(applicationId),
+    queryFn: () => studentService.fetchLogbook(applicationId),
+    enabled: Boolean(applicationId),
+  })
+}
+
+export function useSubmitLogbookEntry(applicationId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: SubmitLogbookInput) => studentService.submitLogbookEntry(applicationId, input),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: studentQueryKeys.logbook(applicationId) })
     },
   })
 }

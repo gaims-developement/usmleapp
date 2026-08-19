@@ -17,7 +17,7 @@ import { Widget } from '@/components/ui/widget'
 import { QuickActions, type QuickAction } from '@/components/ui/quick-actions'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { PageLoader } from '@/components/ui/spinner'
-import { StatusBadge, applicationPriorityMeta, applicationStatusMeta, reviewerAvailabilityMeta, supportPriorityMeta, supportStatusMeta } from '@/components/ui/status-badge'
+import { StatusBadge, applicationStatusMeta, reviewerAvailabilityMeta, supportPriorityMeta, supportStatusMeta } from '@/components/ui/status-badge'
 import { useToast } from '@/components/ui/toast'
 import {
   ApplicationActions,
@@ -80,14 +80,6 @@ export function AdminOverviewPage() {
     },
     { key: 'student', header: 'Student', cell: r => r.student, sortValue: r => r.student },
     { key: 'hospital', header: 'Hospital', cell: r => <span className="max-w-52 truncate">{r.hospital}</span> },
-    {
-      key: 'priority',
-      header: 'Priority',
-      cell: r => {
-        const meta = applicationPriorityMeta(r.priority)
-        return <StatusBadge label={meta.label} tone={meta.tone} />
-      },
-    },
     {
       key: 'status',
       header: 'Status',
@@ -173,11 +165,14 @@ export function AdminOverviewPage() {
       />
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {kpis.data!.map(kpi => (
-          <Link key={kpi.id} to={kpi.to} className="block">
-            <KpiCard label={kpi.label} value={String(kpi.value)} icon={kpi.icon} hint={kpi.hint} />
-          </Link>
-        ))}
+        {(kpis.data ?? []).map(kpi => {
+          const Icon = kpi.icon || ClipboardList
+          return (
+            <Link key={kpi.id || kpi.label} to={kpi.to || '/dashboard/admin/applications'} className="block">
+              <KpiCard label={kpi.label} value={String(kpi.value)} icon={Icon} hint={kpi.hint} />
+            </Link>
+          )
+        })}
       </div>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-3">

@@ -41,6 +41,8 @@ enum DocumentVerification {
   PENDING
   VERIFIED
   NEEDS_ATTENTION
+  REQUIRES_UPDATE
+  REJECTED
 }
 
 enum ProgramStatus {
@@ -129,6 +131,38 @@ enum PartnerRegistrationStatus {
   REVIEWED
   APPROVED
   REJECTED
+  INFO_REQUESTED
+}
+
+enum ForumPostType {
+  DISCUSSION
+  QUESTION
+  EXPERIENCE
+  RESOURCE
+  CLINICAL_CASE
+  HOSPITAL_REVIEW
+}
+
+enum ForumPostStatus {
+  PUBLISHED
+  HIDDEN
+  DELETED
+}
+
+enum ForumReportReason {
+  SPAM
+  HARASSMENT
+  MEDICAL_MISINFORMATION
+  OFFENSIVE_CONTENT
+  ADVERTISING
+  PERSONAL_INFORMATION
+  OTHER
+}
+
+enum ForumReportStatus {
+  PENDING
+  RESOLVED
+  DISMISSED
 }
 
 model Role {
@@ -202,6 +236,18 @@ model User {
   calendarEvents               CalendarEvent[]           @relation("EventCreator")
   createdByPrograms            Program[]                 @relation("ProgramCreator")
   createdByAnnouncements       Announcement[]            @relation("AnnouncementCreator")
+  createdInvitationCodes       ReviewerInvitationCode[]
+  forumPosts                   ForumPost[]
+  forumComments                ForumComment[]
+  forumReactions               ForumReaction[]
+  forumBookmarks               ForumBookmark[]
+  forumReportsReported         ForumReport[]              @relation("ReportReporter")
+  forumReportsResolved         ForumReport[]              @relation("ReportResolver")
+  forumUserModeration          ForumUserModeration?
+  forumModerationAudits        ForumModerationAudit[]     @relation("ModeratedUser")
+  forumModerationActions       ForumModerationAudit[]     @relation("ModeratorActor")
+  forumModerationAppeals       ForumModerationAppeal[]    @relation("AppealUser")
+  forumAppealsReviewed         ForumModerationAppeal[]    @relation("AppealReviewer")
 
   @@index([roleId])
   @@index([email])
@@ -311,10 +357,19 @@ model StudentDocument {
   required         Boolean        @default(true)
   status           String         @default("missing") // missing, uploaded, expiring
   fileName         String?
+  mimeType         String?
+  fileSize         Int?
+  storageProvider  String?
+  storagePath      String?
   uploadedAt       DateTime?
   expiresAt        DateTime?
+  note             String?
+  rejectedAt       DateTime?
+  rejectedById     String?
+  version          Int            @default(1)
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
+  notifications    Notification[]
 
   @@unique([studentProfileId, name])
   @@index([studentProfileId])
@@ -341,6 +396,8 @@ model HospitalProfile {
   city             String?
   state            String?
   country          String?
+  address          String?
+  website          String?
   email            String?
   phone            String?
   description      String?  @db.Text
@@ -354,13 +411,44 @@ model HospitalProfile {
   updatedAt        DateTime @updatedAt
 
   accreditation        HospitalAccreditation[]
+  hospitalCodes        HospitalRegistrationCode[]
+  departments          Department[]
   programs             Program[]
   doctors              DoctorProfile[]
+  reviewers            ReviewerProfile[]
   calendarEvents       CalendarEvent[]
   partnerRegistrations PartnerRegistration[]
 
   @@index([name])
   @@index([status])
+}
+
+model Department {
+  id         String          @id @default(cuid())
+  hospitalId String
+  hospital   HospitalProfile @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  name       String
+  createdAt  DateTime        @default(now())
+
+  doctors DoctorProfile[]
+
+  @@unique([hospitalId, name])
+  @@index([hospitalId])
+}
+
+model HospitalRegistrationCode {
+  id         String          @id @default(cuid())
+  hospitalId String
+  hospital   HospitalProfile @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  code       String          @unique
+  isActive   Boolean         @default(true)
+  usedCount  Int             @default(0)
+  expiresAt  DateTime?
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  @@index([hospitalId])
+  @@index([isActive])
 }
 
 model HospitalAccreditation {
@@ -379,7 +467,11 @@ model DoctorProfile {
   user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   hospitalId       String?
   hospital         HospitalProfile? @relation(fields: [hospitalId], references: [id], onDelete: SetNull)
+  departmentId     String?
+  department       Department?      @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   specialty        String?
+  title            String?
+  licenseNumber    String?
   email            String?
   phone            String?
   availability     String?
@@ -398,24 +490,49 @@ model DoctorProfile {
   certificates   Certificate[]
 
   @@index([hospitalId])
+  @@index([departmentId])
   @@index([status])
 }
 
 model ReviewerProfile {
-  id         String   @id @default(cuid())
-  userId     String   @unique
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  specialty  String?
-  department String?
-  timezone   String?
-  joinedAt   DateTime @default(now())
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id                String           @id @default(cuid())
+  userId            String           @unique
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  hospitalId        String?
+  hospital          HospitalProfile? @relation(fields: [hospitalId], references: [id], onDelete: SetNull)
+  specialty         String?
+  department        String?
+  timezone          String?
+  title             String?
+  institution       String?
+  phone             String?
+  yearsOfExperience Int?
+  status            String?
+  joinedAt          DateTime         @default(now())
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
 
   applications Application[]
   reviews      ApplicationReview[]
 
+  @@index([hospitalId])
   @@index([department])
+  @@index([status])
+}
+
+model ReviewerInvitationCode {
+  id          String    @id @default(cuid())
+  code        String    @unique
+  isActive    Boolean   @default(true)
+  usedCount   Int       @default(0)
+  expiresAt   DateTime?
+  createdById String?
+  createdBy   User?     @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([isActive])
+  @@index([createdById])
 }
 
 model Program {
@@ -624,6 +741,8 @@ model LogbookEntry {
   doctorProfileId String
   doctorProfile   DoctorProfile @relation(fields: [doctorProfileId], references: [id], onDelete: Restrict)
   entryDate       DateTime?
+  type            String?
+  description     String?       @db.Text
   status          LogbookStatus @default(DRAFT)
   comments        String?       @db.Text
   createdAt       DateTime      @default(now())
@@ -744,14 +863,18 @@ model Notification {
   user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   applicationId String?
   application   Application?     @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  documentId    String?
+  document      StudentDocument? @relation(fields: [documentId], references: [id], onDelete: SetNull)
   tone          NotificationTone @default(INFO)
   title         String
   body          String           @db.Text
+  details       Json?
   read          Boolean          @default(false)
   createdAt     DateTime         @default(now())
 
   @@index([userId, read])
   @@index([applicationId])
+  @@index([documentId])
 }
 
 model SupportTicket {
@@ -884,6 +1007,7 @@ model PartnerRegistration {
   state             String?
   country           String?
   message           String?                   @db.Text
+  reviewMessage     String?                   @db.Text
   status            PartnerRegistrationStatus @default(PENDING)
   submittedAt       DateTime                  @default(now())
   reviewedAt        DateTime?
@@ -908,3 +1032,194 @@ model AuditLog {
   @@index([entityType, entityId])
   @@index([actorId, createdAt])
 }
+
+model ForumCategory {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  posts ForumPost[]
+
+  @@index([isActive])
+  @@index([sortOrder])
+}
+
+model ForumPost {
+  id           String           @id @default(cuid())
+  authorId     String
+  author       User             @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  categoryId   String
+  category     ForumCategory    @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  title        String           @db.VarChar(200)
+  content      String           @db.Text
+  postType     ForumPostType    @default(DISCUSSION)
+  status       ForumPostStatus  @default(PUBLISHED)
+  upvoteCount  Int              @default(0)
+  commentCount Int              @default(0)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  attachments ForumPostAttachment[]
+  comments    ForumComment[]
+  reactions   ForumReaction[]
+  bookmarks   ForumBookmark[]
+  reports     ForumReport[]
+
+  @@index([authorId])
+  @@index([categoryId])
+  @@index([createdAt])
+  @@index([status])
+  @@index([postType])
+}
+
+model ForumPostAttachment {
+  id              String   @id @default(cuid())
+  postId          String
+  post            ForumPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  storageProvider String
+  url             String   @db.Text
+  publicId        String?
+  fileName        String
+  mimeType        String
+  fileSize        Int
+  createdAt       DateTime @default(now())
+
+  @@index([postId])
+}
+
+model ForumComment {
+  id          String        @id @default(cuid())
+  postId      String
+  post        ForumPost     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  authorId    String
+  author      User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parentId    String?
+  parent      ForumComment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies     ForumComment[] @relation("CommentReplies")
+  content     String        @db.Text
+  status      String        @default("PUBLISHED")
+  upvoteCount Int           @default(0)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  reactions ForumReaction[]
+  reports   ForumReport[]
+
+  @@index([postId])
+  @@index([authorId])
+  @@index([parentId])
+  @@index([createdAt])
+}
+
+model ForumReaction {
+  id        String        @id @default(cuid())
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  postId    String?
+  post      ForumPost?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  commentId String?
+  comment   ForumComment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  type      String        @default("UPVOTE")
+  createdAt DateTime      @default(now())
+
+  @@unique([userId, postId, type])
+  @@unique([userId, commentId, type])
+  @@index([postId])
+  @@index([commentId])
+  @@index([userId])
+}
+
+model ForumBookmark {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  postId    String
+  post      ForumPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+
+  @@unique([userId, postId])
+  @@index([userId])
+  @@index([postId])
+}
+
+model ForumReport {
+  id           String            @id @default(cuid())
+  reporterId   String
+  reporter     User              @relation("ReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  postId       String?
+  post         ForumPost?        @relation(fields: [postId], references: [id], onDelete: Cascade)
+  commentId    String?
+  comment      ForumComment?     @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  reason       ForumReportReason
+  description  String?           @db.Text
+  status       ForumReportStatus @default(PENDING)
+  createdAt    DateTime          @default(now())
+  resolvedAt   DateTime?
+  resolvedById String?
+  resolvedBy   User?             @relation("ReportResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([postId])
+  @@index([commentId])
+  @@index([reporterId])
+}
+
+model ForumUserModeration {
+  id           String    @id @default(cuid())
+  userId       String    @unique
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  strikes      Int       @default(0)
+  isBanned     Boolean   @default(false)
+  bannedAt     DateTime?
+  banExpiresAt DateTime?
+  reason       String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([isBanned])
+}
+
+model ForumModerationAudit {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation("ModeratedUser", fields: [userId], references: [id], onDelete: Cascade)
+  moderatorId      String?
+  moderator        User?    @relation("ModeratorActor", fields: [moderatorId], references: [id], onDelete: SetNull)
+  action           String
+  reason           String   @db.Text
+  severity         String   @default("LOW")
+  matchedTerms     Json?
+  relatedPostId    String?
+  relatedCommentId String?
+  createdAt        DateTime @default(now())
+
+  @@index([userId])
+  @@index([moderatorId])
+  @@index([createdAt])
+}
+
+model ForumModerationAppeal {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation("AppealUser", fields: [userId], references: [id], onDelete: Cascade)
+  reasonForBan  String
+  strikeCount   Int
+  bannedAt      DateTime
+  banExpiresAt  DateTime?
+  appealMessage String    @db.Text
+  status        String    @default("OPEN")
+  reviewedById  String?
+  reviewedBy    User?     @relation("AppealReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewNotes   String?   @db.Text
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+

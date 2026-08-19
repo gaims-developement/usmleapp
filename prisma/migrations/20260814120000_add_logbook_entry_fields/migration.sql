@@ -1,0 +1,2 @@
+ALTER TABLE `LogbookEntry` ADD COLUMN `type` VARCHAR(191) NULL;
+ALTER TABLE `LogbookEntry` ADD COLUMN `description` TEXT NULL;

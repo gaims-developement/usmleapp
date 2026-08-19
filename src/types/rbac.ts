@@ -31,6 +31,12 @@ export interface Role {
   permissions: Permission[]
   /** Roles this role is allowed to create/update/delete. */
   manageableRoles: RoleId[]
+  /**
+   * Roles whose access this role implicitly grants (role hierarchy).
+   * E.g. SUPER_ADMIN supersedes ADMIN, so SUPER_ADMIN passes any
+   * ADMIN gate without duplicating ADMIN checks.
+   */
+  supersedes: RoleId[]
 }
 
 export interface AuthUser {
@@ -39,6 +45,9 @@ export interface AuthUser {
   email: string
   role: RoleId
   onboarded: boolean
+  /** True for seeded demo accounts; real accounts (incl. the real SUPER_ADMIN) are false. */
+  isDemo: boolean
+  avatarUrl?: string | null
   college?: string
   dob?: string
   electives?: string[]
@@ -50,6 +59,50 @@ export interface AuthUser {
   durationPreference?: number
   travelReady?: boolean
   createdAt: string
+  hospital?: {
+    id: string
+    name: string | null
+    city: string | null
+    state: string | null
+    country: string | null
+    address?: string | null
+    website?: string | null
+    email: string | null
+    phone: string | null
+    description: string | null
+    coordinatorName: string | null
+    coordinatorEmail: string | null
+    coordinatorPhone: string | null
+    tier: string | null
+    status: string | null
+  }
+  doctor?: {
+    id: string
+    specialty: string | null
+    title?: string | null
+    licenseNumber?: string | null
+    email: string | null
+    phone: string | null
+    availability: string | null
+    status: string | null
+    hospitalId?: string | null
+    hospitalName?: string | null
+    departmentId?: string | null
+    departmentName?: string | null
+  }
+  reviewer?: {
+    id: string
+    specialty: string | null
+    department: string | null
+    timezone: string | null
+    title?: string | null
+    institution?: string | null
+    phone?: string | null
+    yearsOfExperience?: number | null
+    status?: string | null
+    hospitalId?: string | null
+    hospitalName?: string | null
+  }
 }
 
 export interface LoginCredentials {

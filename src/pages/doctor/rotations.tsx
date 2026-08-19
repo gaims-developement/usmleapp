@@ -90,9 +90,9 @@ export function DoctorRotationsPage() {
           label="Starting Soon"
           value={String(groups.startingSoon.length)}
           icon={CalendarDays}
-          delta="Nov 2 cohort"
+          delta="Upcoming"
           deltaTone="neutral"
-          hint="Orientation underway"
+          hint="Orientation upcoming"
         />
       </div>
 
@@ -106,7 +106,7 @@ export function DoctorRotationsPage() {
 
       <div className="mt-10">
         <h2 className="font-display text-lg font-bold text-ink-900">Starting soon</h2>
-        <p className="text-sm text-ink-500">{groups.startingSoon.length} students begin their rotation on Nov 2.</p>
+        <p className="text-sm text-ink-500">{groups.startingSoon.length} students begin their rotation this cycle.</p>
         <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {groups.startingSoon.map(s => <RotationCard key={s.id} student={s} />)}
         </div>

@@ -19,13 +19,33 @@ export type ApplicationStatus =
   | 'under_review'
   | 'changes_requested'
   | 'additional_info'
+  | 'approved'
   | 'offered'
   | 'confirmed'
   | 'withdrawn'
   | 'rejected'
   | 'forwarded'
+  | 'waitlisted'
+  | 'completed'
 
 export type PaymentMethod = 'razorpay' | 'stripe' | 'card' | 'bank_transfer' | 'upi' | 'paypal'
+
+export type Payment = {
+  id: string
+  applicationId: string
+  receiptNumber: string
+  studentName: string
+  studentEmail: string
+  specialty: string
+  hospital: string
+  amount: number
+  currency: string
+  submittedAt: string
+  paidAt: string
+  status: string
+  paymentMethod: string
+  transactionId: string
+}
 
 export type Application = {
   id: string
@@ -38,6 +58,7 @@ export type Application = {
   state: string // From HospitalProfile
   startDate: string // ISO date string
   durationWeeks: number
+  reviewedAt?: string // ISO date string
   paymentMethod?: PaymentMethod
   documentsIncluded: string[] // Names of documents
   // timeline is a frontend construct, not directly from backend Application model
@@ -50,15 +71,15 @@ export type Elective = {
   hospital: string
   city: string
   state: string
-  rating: number // Mocked for now
-  spots: number // Mocked for now
-  teachingType: 'Inpatient' | 'Outpatient' | 'Mixed' // Mocked for now
+  rating?: number // Not yet tracked in DB; backend returns null until ratings exist
+  spots: number
+  teachingType?: 'Inpatient' | 'Outpatient' | 'Mixed' // Optional; not yet tracked in DB
   fee: number
   description: string
-  highlights: string[] // Mocked for now
+  highlights?: string[] // Optional; not yet tracked in DB
   requirements: string[]
   eligibility: string
-  startDates: string[] // ISO date strings
+  startDates: string[] // ISO date strings; empty when no dates are published yet
   durationWeeks: number[]
   applicationDeadline: string // ISO date string
 }
@@ -67,6 +88,7 @@ export type DocumentStatus = 'missing' | 'uploaded' | 'expiring' | 'verified' | 
 
 export interface UserDocument {
   id: string
+  dbId?: string
   name: string
   category: string
   required: boolean
@@ -74,4 +96,7 @@ export interface UserDocument {
   fileName?: string
   uploadedAt?: string
   expiresAt?: string
+  note?: string
+  rejectedAt?: string
+  version?: number
 }

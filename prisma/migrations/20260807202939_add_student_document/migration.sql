@@ -1,5 +1,5 @@
 -- AlterTable
-ALTER TABLE `platformsetting` ADD COLUMN `enableDemoData` BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE `PlatformSetting` ADD COLUMN `enableDemoData` BOOLEAN NOT NULL DEFAULT true;
 
 -- CreateTable
 CREATE TABLE `StudentDocument` (

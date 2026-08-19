@@ -13,6 +13,7 @@ import { HospitalApplicationsTable } from '@/components/hospital/applications-ta
 import {
   useCreateHospitalProgram,
   useHospitalApplications,
+  useHospitalProfile,
   useHospitalProgram,
   useUpdateHospitalProgram,
 } from '@/lib/hospitalQueries'
@@ -37,9 +38,10 @@ export function HospitalProgramDetailPage() {
   const navigate = useNavigate()
   const toast = useToast()
 
-  const isNew = id === 'new'
+  const isNew = !id || id === 'new'
   const program = useHospitalProgram(isNew ? '' : id)
   const applications = useHospitalApplications()
+  const hospital = useHospitalProfile()
   const create = useCreateHospitalProgram()
   const update = useUpdateHospitalProgram()
 
@@ -68,7 +70,28 @@ export function HospitalProgramDetailPage() {
 
   if (!isNew && program.isLoading) return <PageLoader label="Loading program…" />
 
-  const existing = program.data
+  if (!isNew && program.isError && !program.data) {
+    return (
+      <div>
+        <button
+          type="button"
+          onClick={() => navigate('/dashboard/hospital/programs')}
+          className="mb-4 inline-flex cursor-pointer items-center gap-1.5 text-sm font-semibold text-ink-500 transition-colors hover:text-ink-900"
+        >
+          <ArrowLeft className="size-4" aria-hidden />
+          Back to programs
+        </button>
+        <div className="rounded-3xl border border-ink-200 bg-white p-12 text-center shadow-soft">
+          <p className="font-display text-base font-bold text-ink-900">Program not found</p>
+          <p className="mt-1 text-sm text-ink-500">
+            This program may have been removed, or you don't have access to it.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  const existing = !Array.isArray(program.data) ? program.data : undefined
 
   function set<K extends keyof HospitalProgramInput>(key: K, value: HospitalProgramInput[K]) {
     setForm(prev => ({ ...prev, [key]: value }))
@@ -120,7 +143,9 @@ export function HospitalProgramDetailPage() {
             {existing && <StatusBadge label={hospitalProgramMeta(existing.status).label} tone={hospitalProgramMeta(existing.status).tone} />}
           </div>
           <p className="mt-1 text-sm text-ink-500">
-            {isNew ? 'Create a new elective rotation for students.' : `${existing?.id} · ${existing?.department} · ${existing?.duration}`}
+            {isNew
+              ? `Create a new elective rotation for ${hospital.data?.name || 'your hospital'}.`
+              : `${hospital.data?.name || 'Hospital'} · ${existing?.department || '—'} · ${existing?.duration || '—'}`}
           </p>
         </div>
         <Button size="sm" onClick={handleSubmit} disabled={create.isPending || update.isPending}>
@@ -210,33 +235,38 @@ export function HospitalProgramDetailPage() {
               </p>
               <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-ink-100">
                 <div
-                  className={existing.filled >= existing.seats ? 'h-full rounded-full bg-red-500' : 'h-full rounded-full bg-brand-500'}
-                  style={{ width: `${Math.round((existing.filled / existing.seats) * 100)}%` }}
+                  className={(existing.filled ?? 0) >= (existing.seats ?? 0) ? 'h-full rounded-full bg-red-500' : 'h-full rounded-full bg-brand-500'}
+                  style={{
+                    width:
+                      (existing.seats ?? 0) > 0
+                        ? `${Math.min(100, Math.round(((existing.filled ?? 0) / (existing.seats ?? 0)) * 100))}%`
+                        : '0%',
+                  }}
                 />
               </div>
             </section>
             <section className="rounded-3xl border border-ink-200 bg-white p-5 shadow-soft">
               <h3 className="font-display text-sm font-bold text-ink-900">Faculty</h3>
               <div className="mt-3 space-y-2">
-                {existing.faculty.map(f => (
+                {(existing.faculty ?? []).map(f => (
                   <p key={f} className="rounded-xl bg-ink-50 px-3 py-2 text-sm font-semibold text-ink-800">{f}</p>
                 ))}
-                {existing.faculty.length === 0 && <p className="text-sm text-ink-500">No faculty assigned yet.</p>}
+                {(existing.faculty ?? []).length === 0 && <p className="text-sm text-ink-500">No faculty assigned yet.</p>}
               </div>
             </section>
             <section className="rounded-3xl border border-ink-200 bg-white p-5 shadow-soft">
               <h3 className="font-display text-sm font-bold text-ink-900">Available dates</h3>
               <div className="mt-3 space-y-2">
-                {existing.availableDates.map(d => (
+                {(existing.availableDates ?? []).map(d => (
                   <p key={d} className="rounded-xl bg-ink-50 px-3 py-2 text-sm font-semibold text-ink-800">{d}</p>
                 ))}
-                {existing.availableDates.length === 0 && <p className="text-sm text-ink-500">No dates listed.</p>}
+                {(existing.availableDates ?? []).length === 0 && <p className="text-sm text-ink-500">No dates listed.</p>}
               </div>
             </section>
             <section className="rounded-3xl border border-ink-200 bg-white p-5 shadow-soft">
               <h3 className="font-display text-sm font-bold text-ink-900">Required documents</h3>
               <div className="mt-3 flex flex-wrap gap-2">
-                {existing.requiredDocuments.map(d => (
+                {(existing.requiredDocuments ?? []).map(d => (
                   <span key={d} className="rounded-full bg-ink-100 px-3 py-1 text-xs font-semibold text-ink-700">{d}</span>
                 ))}
               </div>

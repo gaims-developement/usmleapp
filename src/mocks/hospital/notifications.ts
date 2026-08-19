@@ -5,6 +5,7 @@ export interface HospitalNotification {
   message: string
   time: string
   read: boolean
+  createdAt?: string | null
 }
 
 export const hospitalNotifications: HospitalNotification[] = [

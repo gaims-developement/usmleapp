@@ -8,6 +8,7 @@ import {
   CircleAlert,
   Info,
   LogOut,
+  Megaphone,
   Search,
   TriangleAlert,
   User,
@@ -32,14 +33,35 @@ import {
   useMarkDoctorNotificationsRead,
 } from '@/lib/doctorQueries'
 import {
+  useMarkStudentNotificationRead,
   useMarkStudentNotificationsRead,
   useStudentNotifications,
 } from '@/lib/studentQueries'
-import { cn } from '@/lib/utils'
+import { apiGet } from '@/lib/apiClient'
+import { useQuery } from '@tanstack/react-query'
+import { cn, formatNotificationTime } from '@/lib/utils'
 import type { NotificationTone } from '@/mocks/admin/ops'
 import type { HospitalNotification } from '@/mocks/hospital/notifications'
 import type { DoctorNotification } from '@/mocks/doctor/notifications'
 import type { StudentNotification } from '@/mocks/student/notifications'
+
+// Role-aware destinations for the notifications / announcements section.
+// Only routes that already exist in the router are used here.
+const notificationsRoute: Partial<Record<string, string>> = {
+  SUPER_ADMIN: '/dashboard/super-admin/announcements',
+  ADMIN: '/dashboard/admin/announcements',
+  HOSPITAL: '/dashboard/hospital/announcements',
+  STUDENT: '/announcements',
+}
+
+const roleDashboardRoute: Partial<Record<string, string>> = {
+  SUPER_ADMIN: '/dashboard/super-admin',
+  ADMIN: '/dashboard/admin',
+  REVIEWER: '/dashboard/reviewer',
+  HOSPITAL: '/dashboard/hospital',
+  DOCTOR: '/dashboard/doctor',
+  STUDENT: '/dashboard/student',
+}
 
 const toneIcon: Record<NotificationTone, { icon: LucideIcon; className: string }> = {
   success: { icon: Check, className: 'bg-brand-50 text-brand-600' },
@@ -161,8 +183,25 @@ export function TopbarSearch({ nav }: { nav: AppNavItem[] }) {
   )
 }
 
+interface BellAnnouncement {
+  id: string
+  title: string
+  body: string
+  author: string | null
+  publishedAt: string
+}
+
+function useBellAnnouncements() {
+  return useQuery({
+    queryKey: ['bell', 'announcements'],
+    queryFn: () => apiGet<BellAnnouncement[]>('/notifications/announcements'),
+  })
+}
+
 export function NotificationCenter() {
   const { user } = useAuth()
+  const navigate = useNavigate()
+  const [open, setOpen] = useState(false)
   const isReviewer = user?.role === 'REVIEWER'
   const isHospital = user?.role === 'HOSPITAL'
   const isDoctor = user?.role === 'DOCTOR'
@@ -172,11 +211,13 @@ export function NotificationCenter() {
   const hospitalNotifications = useHospitalNotifications()
   const doctorNotifications = useDoctorNotifications()
   const studentNotifications = useStudentNotifications()
+  const bellAnnouncements = useBellAnnouncements()
   const markAdminRead = useMarkNotificationsRead()
   const markReviewerRead = useMarkReviewerNotificationsRead()
   const markHospitalRead = useMarkHospitalNotificationsRead()
   const markDoctorRead = useMarkDoctorNotificationsRead()
   const markStudentRead = useMarkStudentNotificationsRead()
+  const markStudentOneRead = useMarkStudentNotificationRead()
 
   const source = isReviewer
     ? reviewerNotifications
@@ -196,22 +237,73 @@ export function NotificationCenter() {
         : isStudent
           ? markStudentRead
           : markAdminRead
-  const unread = (source.data ?? []).filter(n => !n.read).length
 
-  const items = (source.data ?? []).map(n => {
+  const notificationItems = (source.data ?? []).map(n => {
     if ('body' in n) {
-      return { id: n.id, read: n.read, title: n.title, body: n.body, time: n.time, icon: toneIcon[n.tone] }
+      return {
+        id: n.id,
+        read: n.read,
+        title: n.title,
+        body: n.body,
+        createdAt: n.createdAt ?? null,
+        time: n.time,
+        icon: toneIcon[n.tone],
+        itemType: 'notification' as const,
+      }
     }
     const tone =
       studentTone[n.type as keyof typeof studentTone] ??
       doctorTone[n.type as keyof typeof doctorTone] ??
       hospitalTone[n.type as keyof typeof hospitalTone] ??
       'info'
-    return { id: n.id, read: n.read, title: n.title, body: n.message, time: n.time, icon: toneIcon[tone] }
+    return {
+      id: n.id,
+      read: n.read,
+      title: n.title,
+      body: n.message,
+      createdAt: n.createdAt ?? null,
+      time: n.time,
+      icon: toneIcon[tone],
+      itemType: 'notification' as const,
+    }
   })
+
+  const announcementItems = (bellAnnouncements.data ?? []).map(a => ({
+    id: `ann-${a.id}`,
+    read: true,
+    title: a.title,
+    body: a.body,
+    createdAt: a.publishedAt ?? null,
+    time: '',
+    icon: toneIcon.info,
+    itemType: 'announcement' as const,
+  }))
+
+  const items = useMemo(() => {
+    const combined = [...notificationItems, ...announcementItems]
+    combined.sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+      return dateB - dateA
+    })
+    return combined.slice(0, 30)
+  }, [notificationItems, announcementItems])
+
+  const unread = notificationItems.filter(n => !n.read).length
+
+  function handleItemClick(n: (typeof items)[number]) {
+    if (isStudent && !n.read) markStudentOneRead.mutate(n.id)
+    setOpen(false)
+    const role = user?.role
+    const destination =
+      (role && (notificationsRoute[role] ?? roleDashboardRoute[role])) ?? '/dashboard'
+    navigate(destination)
+  }
 
   return (
     <Popover
+      open={open}
+      onOpenChange={setOpen}
       align="right"
       panelClassName="w-[22rem]"
       trigger={
@@ -236,7 +328,7 @@ export function NotificationCenter() {
         </button>
       </div>
       <div className="max-h-80 overflow-y-auto">
-        {source.isLoading ? (
+        {source.isLoading || bellAnnouncements.isLoading ? (
           <div className="space-y-3 p-4">
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="h-12 animate-pulse rounded-xl bg-ink-100" />
@@ -246,23 +338,45 @@ export function NotificationCenter() {
           <p className="px-4 py-8 text-center text-sm text-ink-500">You're all caught up.</p>
         ) : (
           items.map(n => (
-            <div
+            <button
               key={n.id}
+              type="button"
+              onClick={() => handleItemClick(n)}
               className={cn(
-                'flex gap-3 border-b border-ink-100/70 px-4 py-3 last:border-0',
+                'flex w-full cursor-pointer gap-3 border-b border-ink-100/70 px-4 py-3 text-left last:border-0 transition-colors hover:bg-ink-50/60',
                 !n.read && 'bg-brand-50/40',
               )}
             >
               <span className={cn('mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg', n.icon.className)}>
-                <n.icon.icon className="size-4" aria-hidden />
+                {n.itemType === 'announcement' ? (
+                  <Megaphone className="size-4" aria-hidden />
+                ) : (
+                  <n.icon.icon className="size-4" aria-hidden />
+                )}
               </span>
-              <div className="min-w-0 flex-1">
-                <p className={cn('text-sm text-ink-800', !n.read && 'font-semibold')}>{n.title}</p>
-                <p className="truncate text-xs text-ink-500">{n.body}</p>
-                <p className="mt-0.5 text-[11px] text-ink-400">{n.time}</p>
-              </div>
+              <span className="min-w-0 flex-1">
+                {n.itemType === 'announcement' && (
+                  <span className="mb-1 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-700">
+                    Announcement
+                  </span>
+                )}
+                <span
+                  className={cn(
+                    'block text-sm text-ink-900',
+                    !n.read ? 'font-bold' : 'font-semibold',
+                  )}
+                >
+                  {n.title}
+                </span>
+                <span className="mt-1.5 block rounded-xl border border-ink-100 bg-ink-50/60 px-3 py-2">
+                  <span className="block truncate text-xs leading-relaxed text-ink-700">{n.body}</span>
+                  <span className="mt-1 block text-[11px] font-medium text-ink-400">
+                    {n.createdAt ? formatNotificationTime(n.createdAt) : n.time}
+                  </span>
+                </span>
+              </span>
               {!n.read && <span className="mt-1.5 size-2 shrink-0 rounded-full bg-brand-500" aria-hidden />}
-            </div>
+            </button>
           ))
         )}
       </div>
@@ -287,7 +401,7 @@ export function UserMenu({ nav }: { nav: AppNavItem[] }) {
       closeOnSelect
       trigger={
         <span className="flex items-center gap-2">
-          <Avatar name={user?.name ?? 'IMG'} />
+          <Avatar name={user?.name ?? 'IMG'} src={user?.avatarUrl ?? undefined} />
           <ChevronDown className="hidden size-4 text-ink-400 sm:block" aria-hidden />
         </span>
       }

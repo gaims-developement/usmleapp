@@ -5,6 +5,13 @@ export interface StudentNotification {
   message: string
   time: string
   read: boolean
+  applicationId?: string | null
+  documentId?: string | null
+  documentName?: string | null
+  rejectionReason?: string | null
+  createdAt?: string | null
+  rejectedAt?: string | null
+  details?: Record<string, unknown> | null
 }
 
 export const studentNotifications: StudentNotification[] = [

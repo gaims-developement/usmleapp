@@ -10,6 +10,7 @@ import { Avatar } from '@/components/ui/avatar'
 import { StatusBadge, roleBadgeMeta } from '@/components/ui/status-badge'
 import { useToast } from '@/components/ui/toast'
 import { useAuth } from '@/hooks/useAuth'
+import { formatMemberSince } from '@/lib/utils'
 import { roleById } from '@/roles/roles'
 
 export function AdminProfilePage() {
@@ -60,7 +61,7 @@ export function AdminProfilePage() {
         <div className="space-y-4 lg:col-span-2">
           <Widget title="Personal information" subtitle="Shown to team members and partners.">
             <div className="flex items-center gap-4">
-              <Avatar name={name} className="size-16 text-lg" />
+              <Avatar name={name} src={user.avatarUrl} className="size-16 text-lg" />
               <div>
                 <p className="font-display text-lg font-bold text-ink-900">{name}</p>
                 <p className="text-sm text-ink-500">{title}</p>
@@ -147,7 +148,7 @@ export function AdminProfilePage() {
               </div>
               <div className="flex justify-between">
                 <dt className="text-ink-500">Member since</dt>
-                <dd className="font-semibold text-ink-900">Jan 2026</dd>
+                <dd className="font-semibold text-ink-900">{formatMemberSince(user.createdAt)}</dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-ink-500">Two-factor auth</dt>
